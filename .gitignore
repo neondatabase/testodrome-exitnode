@@ -19,3 +19,6 @@
 .env*
 
 *.tar
+
+# Other
+app.log
