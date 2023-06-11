@@ -33,11 +33,15 @@ func (c *Client) sendJSONRequest(method string, path string, requestObj any, res
 		"request": requestObj,
 	}).Info("sending request")
 
-	requestBody, err := json.Marshal(requestObj)
-	if err != nil {
-		return err
+	var reader io.Reader
+	if requestObj != nil {
+		requestBody, err := json.Marshal(requestObj)
+		if err != nil {
+			return err
+		}
+		reader = bytes.NewReader(requestBody)
 	}
-	req, err := http.NewRequest(method, url, bytes.NewReader(requestBody))
+	req, err := http.NewRequest(method, url, reader)
 	if err != nil {
 		return err
 	}
@@ -69,14 +73,18 @@ func (c *Client) sendJSONRequest(method string, path string, requestObj any, res
 		return fmt.Errorf("got status code %d, body = %s", resp.StatusCode, body)
 	}
 
-	err = json.Unmarshal(body, responseObj)
-	if err != nil {
-		return err
+	if responseObj != nil {
+		err = json.Unmarshal(body, responseObj)
+		if err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
 func (c *Client) CreateProject(req *CreateProject) (*CreateProjectResponse, error) {
+	// https://api-docs.neon.tech/reference/createproject
 	var resp CreateProjectResponse
 	err := c.sendJSONRequest("POST", "/projects", &CreateProjectRequest{
 		Project: req,
@@ -85,4 +93,9 @@ func (c *Client) CreateProject(req *CreateProject) (*CreateProjectResponse, erro
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func (c *Client) DeleteProject(projectID string) error {
+	// https://api-docs.neon.tech/reference/deleteproject
+	return c.sendJSONRequest("DELETE", fmt.Sprintf("/projects/%s", projectID), nil, nil)
 }

@@ -70,6 +70,13 @@ func main() {
 		NeonClient:  neonClient,
 		Config:      cfg,
 	})
+	ruleList = append(ruleList, &rules.DeleteProject{
+		ProjectsN:   5,
+		Provider:    cfg.Provider,
+		RegionRepo:  regionRepo,
+		ProjectRepo: projectRepo,
+		NeonClient:  neonClient,
+	})
 
 	for {
 		for _, rule := range ruleList {

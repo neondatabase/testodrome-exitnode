@@ -67,7 +67,7 @@ func (c *CreateProject) createProject(region models.Region) error {
 
 	// TODO: store information about project creation API query in the database.
 	createRequest := &neonapi.CreateProject{
-		Name:     fmt.Sprintf("@%s-%d", c.Config.Exitnode, projectSeqID),
+		Name:     fmt.Sprintf("test@%s-%d", c.Config.Exitnode, projectSeqID),
 		RegionID: region.DatabaseRegion,
 	}
 

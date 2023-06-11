@@ -38,3 +38,19 @@ func (r *ProjectRepo) FindLastCreatedProject(regionID uint) (*models.Project, er
 func (r *ProjectRepo) Create(project *models.Project) error {
 	return r.db.Create(project).Error
 }
+
+func (r *ProjectRepo) FindAllByRegion(regionID uint) ([]models.Project, error) {
+	var projects []models.Project
+	err := r.db.
+		Where("region_id = ?", regionID).
+		Find(&projects).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return projects, nil
+}
+
+func (r *ProjectRepo) Delete(project *models.Project) error {
+	return r.db.Delete(project).Error
+}
