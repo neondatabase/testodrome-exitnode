@@ -1,23 +1,23 @@
 package main
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
 	"github.com/petuhovskiy/neon-lights/internal/app"
+	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/rules"
-
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 func main() {
-	log.SetFormatter(&log.JSONFormatter{})
-	log.SetReportCaller(true)
-	log.SetLevel(log.DebugLevel)
+	_ = log.DefaultGlobals()
+	ctx := context.Background()
 
 	base, err := app.NewAppFromEnv()
 	if err != nil {
-		log.WithError(err).Fatal("failed to init app")
+		log.Fatal(ctx, "failed to init app", zap.Error(err))
 	}
 
 	var ruleList []rules.ExecutableRule
@@ -28,9 +28,9 @@ func main() {
 
 	for {
 		for _, rule := range ruleList {
-			err := rule.Execute()
+			err := rule.Execute(ctx)
 			if err != nil {
-				log.WithError(err).Error("rule execution error")
+				log.Error(ctx, "rule execution failed", zap.Error(err))
 			}
 		}
 

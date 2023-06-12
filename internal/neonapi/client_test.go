@@ -1,16 +1,12 @@
 package neonapi
 
 import (
+	"context"
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	"github.com/petuhovskiy/neon-lights/internal/log"
 )
-
-func init() {
-	// TODO: this is a quick hack to enable JSON logger
-	logrus.SetFormatter(&logrus.JSONFormatter{})
-}
 
 func testClient(t *testing.T) *Client {
 	apiKey := os.Getenv("NEON_API_KEY")
@@ -22,8 +18,11 @@ func testClient(t *testing.T) *Client {
 
 // Run with `export $(cat .env | xargs) && go test ./... -v -run TestCreateProject`
 func TestCreateProject(t *testing.T) {
+	_ = log.DefaultGlobals()
+	ctx := context.Background()
+
 	client := testClient(t)
-	resp, err := client.CreateProject(&CreateProject{
+	resp, err := client.CreateProject(ctx, &CreateProject{
 		Name:     "test-project-1",
 		RegionID: "aws-eu-west-1",
 	})

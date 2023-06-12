@@ -2,12 +2,14 @@ package neonapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/petuhovskiy/neon-lights/internal/log"
+	"go.uber.org/zap"
 )
 
 // TODO: consider using https://github.com/kislerdm/neon-sdk-go instead
@@ -24,14 +26,16 @@ func NewClient(domain string, apiKey string) *Client {
 	}
 }
 
-func (c *Client) sendJSONRequest(method string, path string, requestObj any, responseObj any) error {
+func (c *Client) sendJSONRequest(ctx context.Context, method string, path string, requestObj any, responseObj any) error {
 	url := c.baseURL + path
 
-	log.WithFields(log.Fields{
-		"method":  method,
-		"url":     url,
-		"request": requestObj,
-	}).Info("sending request")
+	log.Info(
+		ctx,
+		"sending request",
+		zap.String("method", method),
+		zap.String("url", url),
+		zap.Any("request", requestObj),
+	)
 
 	var reader io.Reader
 	if requestObj != nil {
@@ -48,6 +52,7 @@ func (c *Client) sendJSONRequest(method string, path string, requestObj any, res
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", c.authHeader)
 	req.Header.Set("Accept", "application/json")
+	// TODO: set context?
 
 	// TODO: custom client
 	resp, err := http.DefaultClient.Do(req)
@@ -62,12 +67,14 @@ func (c *Client) sendJSONRequest(method string, path string, requestObj any, res
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"method": method,
-		"url":    url,
-		"status": resp.Status,
-		"body":   json.RawMessage(body),
-	}).Info("got response")
+	log.Info(
+		ctx,
+		"got response",
+		zap.String("method", method),
+		zap.String("url", url),
+		zap.String("status", resp.Status),
+		zap.Any("body", json.RawMessage(body)),
+	)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("got status code %d, body = %s", resp.StatusCode, body)
@@ -83,10 +90,10 @@ func (c *Client) sendJSONRequest(method string, path string, requestObj any, res
 	return nil
 }
 
-func (c *Client) CreateProject(req *CreateProject) (*CreateProjectResponse, error) {
+func (c *Client) CreateProject(ctx context.Context, req *CreateProject) (*CreateProjectResponse, error) {
 	// https://api-docs.neon.tech/reference/createproject
 	var resp CreateProjectResponse
-	err := c.sendJSONRequest("POST", "/projects", &CreateProjectRequest{
+	err := c.sendJSONRequest(ctx, "POST", "/projects", &CreateProjectRequest{
 		Project: req,
 	}, &resp)
 	if err != nil {
@@ -95,7 +102,7 @@ func (c *Client) CreateProject(req *CreateProject) (*CreateProjectResponse, erro
 	return &resp, nil
 }
 
-func (c *Client) DeleteProject(projectID string) error {
+func (c *Client) DeleteProject(ctx context.Context, projectID string) error {
 	// https://api-docs.neon.tech/reference/deleteproject
-	return c.sendJSONRequest("DELETE", fmt.Sprintf("/projects/%s", projectID), nil, nil)
+	return c.sendJSONRequest(ctx, "DELETE", fmt.Sprintf("/projects/%s", projectID), nil, nil)
 }

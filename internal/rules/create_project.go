@@ -1,15 +1,17 @@
 package rules
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/conf"
+	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 // Rule to create a project in every region at least once per `interval` minutes.
@@ -36,41 +38,43 @@ func NewCreateProject(a *app.App, interval time.Duration) *CreateProject {
 	}
 }
 
-func (c *CreateProject) Execute() error {
+func (c *CreateProject) Execute(ctx context.Context) error {
+	ctx = log.With(ctx, zap.String("rule", "create_project"))
+
 	regions, err := c.regionRepo.FindByProvider(c.provider)
 	if err != nil {
 		return err
 	}
 
 	for _, region := range regions {
-		go c.executeForRegion(region)
+		go c.executeForRegion(ctx, region)
 	}
 	return nil
 }
 
 // Execute rule for a single region. Will create a project only if the last created project
 // is older than GapDuration.
-func (c *CreateProject) executeForRegion(region models.Region) {
-	logger := log.WithField("regionID", region.ID)
+func (c *CreateProject) executeForRegion(ctx context.Context, region models.Region) {
+	ctx = log.With(ctx, zap.Uint("regionID", region.ID))
 
 	project, err := c.projectRepo.FindLastCreatedProject(region.ID)
 	if err != nil {
-		logger.WithError(err).Error("failed to find last created project")
+		log.Error(ctx, "failed to find last created project", zap.Error(err))
 		return
 	}
 
 	if project == nil || time.Since(project.CreatedAt) > c.interval {
-		logger.Info("creating project")
-		err := c.createProject(region)
+		log.Info(ctx, "creating project")
+		err := c.createProject(ctx, region)
 		if err != nil {
-			logger.WithError(err).Error("failed to create project")
+			log.Error(ctx, "failed to create project", zap.Error(err))
 			return
 		}
 	}
 }
 
 // Create a project in the given region.
-func (c *CreateProject) createProject(region models.Region) error {
+func (c *CreateProject) createProject(ctx context.Context, region models.Region) error {
 	projectSeqID, err := c.sequence.Next()
 	if err != nil {
 		return err
@@ -82,16 +86,17 @@ func (c *CreateProject) createProject(region models.Region) error {
 		RegionID: region.DatabaseRegion,
 	}
 
-	project, err := c.neonClient.CreateProject(createRequest)
+	project, err := c.neonClient.CreateProject(ctx, createRequest)
 	if err != nil {
 		return err
 	}
+	ctx = log.With(ctx, zap.String("projectID", project.Project.ID))
 
 	var connstr string
 	if len(project.ConnectionUris) == 1 {
 		connstr = project.ConnectionUris[0].ConnectionURI
 	} else {
-		log.WithField("projectID", project.Project.ID).Warn("project has invalid number of connection strings")
+		log.Warn(ctx, "project has invalid number of connection strings")
 	}
 
 	dbProject := models.Project{

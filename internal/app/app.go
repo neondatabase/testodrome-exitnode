@@ -8,11 +8,12 @@ import (
 	"net/http"
 
 	"github.com/petuhovskiy/neon-lights/internal/conf"
+	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -51,12 +52,14 @@ func NewAppFromEnv() (*App, error) {
 }
 
 func (a *App) StartPrometheus() {
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-	err := http.ListenAndServe(a.Config.PrometheusBind, mux)
-	if err != nil && err != http.ErrServerClosed {
-		log.WithError(err).Fatal("prometheus server error")
-	}
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		err := http.ListenAndServe(a.Config.PrometheusBind, mux)
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal(nil, "prometheus server error", zap.Error(err))
+		}
+	}()
 }
 
 func connectDB(cfg *conf.App) (*gorm.DB, error) {

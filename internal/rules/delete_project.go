@@ -1,14 +1,16 @@
 package rules
 
 import (
+	"context"
 	"math/rand"
 	"sort"
 
 	"github.com/petuhovskiy/neon-lights/internal/app"
+	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 // Rule to delete random projects when there are too many projects with the similar configuration (matrix).
@@ -33,26 +35,28 @@ func NewDeleteProject(a *app.App, projectsN int) *DeleteProject {
 	}
 }
 
-func (c *DeleteProject) Execute() error {
+func (c *DeleteProject) Execute(ctx context.Context) error {
+	ctx = log.With(ctx, zap.String("rule", "delete_project"))
+
 	regions, err := c.regionRepo.FindByProvider(c.provider)
 	if err != nil {
 		return err
 	}
 
 	for _, region := range regions {
-		go c.executeForRegion(region)
+		go c.executeForRegion(ctx, region)
 	}
 	return nil
 }
 
 // Execute rule for a single region. Will delete a project only if the are too many.
-func (c *DeleteProject) executeForRegion(region models.Region) {
-	logger := log.WithField("regionID", region.ID)
+func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Region) {
+	ctx = log.With(ctx, zap.Uint("regionID", region.ID))
 
 	// TODO: it is not efficient to load all projects here, but it is ok for now.
 	projects, err := c.projectRepo.FindAllByRegion(region.ID)
 	if err != nil {
-		logger.WithError(err).Error("failed to find projects")
+		log.Error(ctx, "failed to load projects", zap.Error(err))
 		return
 	}
 
@@ -75,19 +79,20 @@ func (c *DeleteProject) executeForRegion(region models.Region) {
 
 	// take the middle project, because we don't want to take too old and too new projects
 	project := projects[len(projects)/2]
-	log.WithField("projectID", project.ID).Info("selected project for deletion")
+	ctx = log.With(ctx, zap.Uint("projectID", project.ID))
+	log.Info(ctx, "selected project for deletion")
 
-	err = c.deleteProject(&project)
+	err = c.deleteProject(ctx, &project)
 	if err != nil {
-		logger.WithError(err).Error("failed to delete project")
+		log.Error(ctx, "failed to delete project", zap.Error(err))
 		return
 	}
 }
 
 // Delete a project.
-func (c *DeleteProject) deleteProject(projectDB *models.Project) error {
+func (c *DeleteProject) deleteProject(ctx context.Context, projectDB *models.Project) error {
 	// calling a delete API
-	err := c.neonClient.DeleteProject(projectDB.ProjectID)
+	err := c.neonClient.DeleteProject(ctx, projectDB.ProjectID)
 	if err != nil {
 		// TODO: retry, otherwise state will be inconsistent
 		return err
@@ -98,6 +103,6 @@ func (c *DeleteProject) deleteProject(projectDB *models.Project) error {
 		return err
 	}
 
-	log.WithField("projectID", projectDB.ID).Info("project deleted")
+	log.Info(ctx, "project deleted")
 	return nil
 }
