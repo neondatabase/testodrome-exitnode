@@ -4,28 +4,37 @@ import (
 	"math/rand"
 	"sort"
 
+	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
 	log "github.com/sirupsen/logrus"
 )
 
-// TODO: refactor to don't use public fields.
-
 // Rule to delete random projects when there are too many projects with the similar configuration (matrix).
 // TODO: make it work with custom matrix, not only per-region.
 type DeleteProject struct {
 	// Target number of projects. Project will be deleted if there are more than this number of projects.
-	ProjectsN int
+	projectsN int
 	// Projects will be deleted only in regions with this provider.
-	Provider    string
-	RegionRepo  *repos.RegionRepo
-	ProjectRepo *repos.ProjectRepo
-	NeonClient  *neonapi.Client
+	provider    string
+	regionRepo  *repos.RegionRepo
+	projectRepo *repos.ProjectRepo
+	neonClient  *neonapi.Client
+}
+
+func NewDeleteProject(a *app.App, projectsN int) *DeleteProject {
+	return &DeleteProject{
+		projectsN:   projectsN,
+		provider:    a.Config.Provider,
+		regionRepo:  a.Repo.Region,
+		projectRepo: a.Repo.Project,
+		neonClient:  a.NeonClient,
+	}
 }
 
 func (c *DeleteProject) Execute() error {
-	regions, err := c.RegionRepo.FindByProvider(c.Provider)
+	regions, err := c.regionRepo.FindByProvider(c.provider)
 	if err != nil {
 		return err
 	}
@@ -41,13 +50,13 @@ func (c *DeleteProject) executeForRegion(region models.Region) {
 	logger := log.WithField("regionID", region.ID)
 
 	// TODO: it is not efficient to load all projects here, but it is ok for now.
-	projects, err := c.ProjectRepo.FindAllByRegion(region.ID)
+	projects, err := c.projectRepo.FindAllByRegion(region.ID)
 	if err != nil {
 		logger.WithError(err).Error("failed to find projects")
 		return
 	}
 
-	if len(projects) <= c.ProjectsN {
+	if len(projects) <= c.projectsN {
 		return
 	}
 
@@ -57,7 +66,7 @@ func (c *DeleteProject) executeForRegion(region models.Region) {
 	})
 
 	// take any N projects
-	projects = projects[:c.ProjectsN]
+	projects = projects[:c.projectsN]
 
 	// sort by creation date
 	sort.Slice(projects, func(i, j int) bool {
@@ -78,13 +87,13 @@ func (c *DeleteProject) executeForRegion(region models.Region) {
 // Delete a project.
 func (c *DeleteProject) deleteProject(projectDB *models.Project) error {
 	// calling a delete API
-	err := c.NeonClient.DeleteProject(projectDB.ProjectID)
+	err := c.neonClient.DeleteProject(projectDB.ProjectID)
 	if err != nil {
 		// TODO: retry, otherwise state will be inconsistent
 		return err
 	}
 
-	err = c.ProjectRepo.Delete(projectDB)
+	err = c.projectRepo.Delete(projectDB)
 	if err != nil {
 		return err
 	}

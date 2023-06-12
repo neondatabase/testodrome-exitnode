@@ -4,29 +4,40 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/petuhovskiy/neon-lights/internal/app"
+	"github.com/petuhovskiy/neon-lights/internal/conf"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
-	"github.com/petuhovskiy/neon-lights/pkg/conf"
 	log "github.com/sirupsen/logrus"
 )
 
-// TODO: refactor to don't use public fields.
-
-// Rule to create a project in every region at least once per GapDuration minutes.
+// Rule to create a project in every region at least once per `interval` minutes.
 type CreateProject struct {
-	GapDuration time.Duration
+	interval time.Duration
 	// Projects will be created only in regions with this provider.
-	Provider    string
-	RegionRepo  *repos.RegionRepo
-	ProjectRepo *repos.ProjectRepo
-	Sequence    *repos.Sequence
-	NeonClient  *neonapi.Client
-	Config      *conf.App
+	provider    string
+	regionRepo  *repos.RegionRepo
+	projectRepo *repos.ProjectRepo
+	sequence    *repos.Sequence
+	neonClient  *neonapi.Client
+	config      *conf.App
+}
+
+func NewCreateProject(a *app.App, interval time.Duration) *CreateProject {
+	return &CreateProject{
+		interval:    interval,
+		provider:    a.Config.Provider,
+		regionRepo:  a.Repo.Region,
+		projectRepo: a.Repo.Project,
+		sequence:    a.Repo.SeqExitnodeProject,
+		neonClient:  a.NeonClient,
+		config:      a.Config,
+	}
 }
 
 func (c *CreateProject) Execute() error {
-	regions, err := c.RegionRepo.FindByProvider(c.Provider)
+	regions, err := c.regionRepo.FindByProvider(c.provider)
 	if err != nil {
 		return err
 	}
@@ -42,13 +53,13 @@ func (c *CreateProject) Execute() error {
 func (c *CreateProject) executeForRegion(region models.Region) {
 	logger := log.WithField("regionID", region.ID)
 
-	project, err := c.ProjectRepo.FindLastCreatedProject(region.ID)
+	project, err := c.projectRepo.FindLastCreatedProject(region.ID)
 	if err != nil {
 		logger.WithError(err).Error("failed to find last created project")
 		return
 	}
 
-	if project == nil || time.Since(project.CreatedAt) > c.GapDuration {
+	if project == nil || time.Since(project.CreatedAt) > c.interval {
 		logger.Info("creating project")
 		err := c.createProject(region)
 		if err != nil {
@@ -60,18 +71,18 @@ func (c *CreateProject) executeForRegion(region models.Region) {
 
 // Create a project in the given region.
 func (c *CreateProject) createProject(region models.Region) error {
-	projectSeqID, err := c.Sequence.Next()
+	projectSeqID, err := c.sequence.Next()
 	if err != nil {
 		return err
 	}
 
 	// TODO: store information about project creation API query in the database.
 	createRequest := &neonapi.CreateProject{
-		Name:     fmt.Sprintf("test@%s-%d", c.Config.Exitnode, projectSeqID),
+		Name:     fmt.Sprintf("test@%s-%d", c.config.Exitnode, projectSeqID),
 		RegionID: region.DatabaseRegion,
 	}
 
-	project, err := c.NeonClient.CreateProject(createRequest)
+	project, err := c.neonClient.CreateProject(createRequest)
 	if err != nil {
 		return err
 	}
@@ -88,10 +99,10 @@ func (c *CreateProject) createProject(region models.Region) error {
 		Name:              project.Project.Name,
 		ProjectID:         project.Project.ID,
 		ConnectionString:  connstr,
-		CreatedByExitnode: c.Config.Exitnode,
+		CreatedByExitnode: c.config.Exitnode,
 	}
 
-	err = c.ProjectRepo.Create(&dbProject)
+	err = c.projectRepo.Create(&dbProject)
 	if err != nil {
 		return fmt.Errorf("failed to create project in the database: %w", err)
 	}
