@@ -36,7 +36,11 @@ type Period struct {
 
 func (p *Period) Sleep(ctx context.Context) {
 	val := p.min + uint(rand.Intn(int(p.max-p.min+1)))
-	time.Sleep(time.Duration(val) * time.Second)
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(time.Duration(val) * time.Second):
+	}
 }
 
 func parsePeriod(str string) (*Period, error) {

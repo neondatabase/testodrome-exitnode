@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/log"
@@ -13,7 +15,17 @@ import (
 
 func main() {
 	_ = log.DefaultGlobals()
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// watch for signals
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func() {
+		sig := <-sigCh
+		log.Info(ctx, "signal received", zap.Stringer("signal", sig))
+		cancel()
+	}()
 
 	base, err := app.NewAppFromEnv()
 	if err != nil {
@@ -37,7 +49,8 @@ func main() {
 
 	err = globalExecutor.Execute(ctx, rule)
 	if err != nil {
-		log.Fatal(ctx, "failed to execute rule", zap.Error(err))
+		log.Error(ctx, "failed to execute rule", zap.Error(err))
+		// continue execution
 	}
 
 	base.Register.WaitAll(ctx)

@@ -44,6 +44,12 @@ func (e *Executor) CreateFromDesc(desc rdesc.Rule) (*Rule, error) {
 }
 
 func (e *Executor) Execute(ctx context.Context, r *Rule) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	var insidePeriodic bool
 	if val, ok := ctx.Value(ctxkeyInsidePeriodic).(bool); ok {
 		insidePeriodic = val
@@ -66,8 +72,13 @@ func (e *Executor) executePeriodic(ctx context.Context, r *Rule, period *Period)
 	ctx = context.WithValue(ctx, ctxkeyInsidePeriodic, true)
 	ctx = log.Into(ctx, "periodic")
 
-	// TODO: watch for ctx.Done()
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		err := e.executeOnce(ctx, r)
 		if err != nil {
 			// TODO: add option to propagate errors
