@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"math/rand"
+	"encoding/json"
 	"time"
 
 	"github.com/petuhovskiy/neon-lights/internal/app"
@@ -20,21 +20,22 @@ func main() {
 		log.Fatal(ctx, "failed to init app", zap.Error(err))
 	}
 
-	var ruleList []rules.ExecutableRule
-	// create new project every 10 minutes (in each region)
-	ruleList = append(ruleList, rules.NewCreateProject(base, time.Minute*10))
-	// delete projects if there are > 5 (in each region)
-	ruleList = append(ruleList, rules.NewDeleteProject(base, 5))
-
-	for {
-		for _, rule := range ruleList {
-			err := rule.Execute(ctx)
-			if err != nil {
-				log.Error(ctx, "rule execution failed", zap.Error(err))
-			}
-		}
-
-		delay := rand.Intn(30) + 5
-		time.Sleep(time.Second * time.Duration(delay))
+	globalExecutor := rules.NewGlobalExecutor(base)
+	rule, err := globalExecutor.ParseJSON(json.RawMessage(`{"act": "create_project", "args": {"interval": "10m"}}`))
+	if err != nil {
+		log.Fatal(ctx, "failed to parse rule", zap.Error(err))
 	}
+
+	err = globalExecutor.Execute(ctx, rule)
+	if err != nil {
+		log.Fatal(ctx, "failed to execute rule", zap.Error(err))
+	}
+
+	time.Sleep(time.Second * 20)
+
+	// var ruleList []rules.ExecutableRule
+	// // create new project every 10 minutes (in each region)
+	// ruleList = append(ruleList, rules.NewCreateProject(base, time.Minute*10))
+	// // delete projects if there are > 5 (in each region)
+	// ruleList = append(ruleList, rules.NewDeleteProject(base, 5))
 }

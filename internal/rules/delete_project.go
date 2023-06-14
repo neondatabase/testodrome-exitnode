@@ -2,6 +2,8 @@ package rules
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math/rand"
 	"sort"
 
@@ -25,14 +27,24 @@ type DeleteProject struct {
 	neonClient  *neonapi.Client
 }
 
-func NewDeleteProject(a *app.App, projectsN int) *DeleteProject {
+type DeleteProjectArgs struct {
+	N int
+}
+
+func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
+	var args DeleteProjectArgs
+	err := json.Unmarshal(j, &args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal args: %w", err)
+	}
+
 	return &DeleteProject{
-		projectsN:   projectsN,
+		projectsN:   args.N,
 		provider:    a.Config.Provider,
 		regionRepo:  a.Repo.Region,
 		projectRepo: a.Repo.Project,
 		neonClient:  a.NeonClient,
-	}
+	}, nil
 }
 
 func (c *DeleteProject) Execute(ctx context.Context) error {

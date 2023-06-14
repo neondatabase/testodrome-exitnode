@@ -2,6 +2,7 @@ package rules
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
+	"github.com/petuhovskiy/neon-lights/internal/rdesc"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
 	"go.uber.org/zap"
 )
@@ -26,16 +28,26 @@ type CreateProject struct {
 	config      *conf.App
 }
 
-func NewCreateProject(a *app.App, interval time.Duration) *CreateProject {
+type CreateProjectArgs struct {
+	Interval rdesc.Duration
+}
+
+func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
+	var args CreateProjectArgs
+	err := json.Unmarshal(j, &args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal args: %w", err)
+	}
+
 	return &CreateProject{
-		interval:    interval,
+		interval:    args.Interval.Duration,
 		provider:    a.Config.Provider,
 		regionRepo:  a.Repo.Region,
 		projectRepo: a.Repo.Project,
 		sequence:    a.Repo.SeqExitnodeProject,
 		neonClient:  a.NeonClient,
 		config:      a.Config,
-	}
+	}, nil
 }
 
 func (c *CreateProject) Execute(ctx context.Context) error {
