@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/bgjobs"
 	"github.com/petuhovskiy/neon-lights/internal/conf"
@@ -14,7 +16,6 @@ import (
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
 	"github.com/petuhovskiy/neon-lights/internal/rdesc"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
-	"go.uber.org/zap"
 )
 
 // Rule to create a project in every region at least once per `interval` minutes.

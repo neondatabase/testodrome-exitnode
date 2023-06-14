@@ -8,16 +8,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
 	"github.com/petuhovskiy/neon-lights/internal/bgjobs"
 	"github.com/petuhovskiy/neon-lights/internal/conf"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 type App struct {
@@ -39,18 +40,18 @@ func NewAppFromEnv() (*App, error) {
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
 
-	repos, err := createRepos(db, cfg)
+	repo, err := createRepos(db, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repos: %w", err)
 	}
 
-	neonClient := neonapi.NewClient(cfg.Provider, cfg.NeonApiKey)
+	neonClient := neonapi.NewClient(cfg.Provider, cfg.NeonAPIKey)
 	register := bgjobs.NewRegister()
 
 	return &App{
 		Config:     cfg,
 		DB:         db,
-		Repo:       repos,
+		Repo:       repo,
 		NeonClient: neonClient,
 		Register:   register,
 	}, nil
@@ -94,7 +95,7 @@ func createRepos(db *gorm.DB, cfg *conf.App) (*Repos, error) {
 		return nil, fmt.Errorf("failed to migrate: %w", err)
 	}
 
-	if cfg.DbDebug {
+	if cfg.DebugDB {
 		db = db.Debug()
 	}
 

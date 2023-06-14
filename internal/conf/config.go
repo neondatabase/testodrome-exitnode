@@ -16,11 +16,11 @@ type App struct {
 	// Provider is a name/domain of the current provider.
 	Provider string `env:"PROVIDER" envDefault:"staging.neon.tech"`
 
-	// NeonApiKey is an API key for the neon.
-	NeonApiKey string `env:"NEON_API_KEY,required"`
+	// NeonAPIKey is an API key for the neon.
+	NeonAPIKey string `env:"NEON_API_KEY,required"`
 
-	// DbDebug enables debug mode for the database.
-	DbDebug bool `env:"DB_DEBUG" envDefault:"false"`
+	// DebugDB enables debug mode for the database.
+	DebugDB bool `env:"DB_DEBUG" envDefault:"false"`
 }
 
 func ParseEnv() (*App, error) {

@@ -7,13 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/conf"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/rdesc"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
-	"go.uber.org/zap"
 )
 
 const DGRUpdateInterval = time.Second * 5
@@ -54,12 +55,12 @@ func NewDoGlobalRules(a *app.App, executor *Executor, j json.RawMessage) (*DoGlo
 	}, nil
 }
 
-func compareRules(old []models.GlobalRule, new []models.GlobalRule) bool {
-	if len(old) != len(new) {
+func compareRules(a []models.GlobalRule, b []models.GlobalRule) bool {
+	if len(a) != len(b) {
 		return false
 	}
 
-	return reflect.DeepEqual(old, new)
+	return reflect.DeepEqual(a, b)
 }
 
 func (r *DoGlobalRules) fetchRules(ctx context.Context) ([]*Rule, error) {

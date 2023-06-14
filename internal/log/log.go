@@ -34,13 +34,13 @@ func FromContext(ctx context.Context) *zap.Logger {
 
 // Into returns context with a new span.
 func Into(ctx context.Context, span string) context.Context {
-	var logger *zap.Logger = FromContext(ctx).WithOptions().Named(span)
+	var logger = FromContext(ctx).WithOptions().Named(span)
 	return context.WithValue(ctx, loggerContextKey, logger)
 }
 
 // With appends fields to logger in context.
 func With(ctx context.Context, args ...zap.Field) context.Context {
-	var logger *zap.Logger = FromContext(ctx).With(args...)
+	var logger = FromContext(ctx).With(args...)
 	return context.WithValue(ctx, loggerContextKey, logger)
 }
 

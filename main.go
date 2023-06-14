@@ -7,10 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"go.uber.org/zap"
+
 	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/rules"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 	err = globalExecutor.Execute(ctx, rule)
 	if err != nil {
 		log.Error(ctx, "failed to execute rule", zap.Error(err))
-		// continue execution
+		// don't exit
 	}
 
 	base.Register.WaitAll(ctx)

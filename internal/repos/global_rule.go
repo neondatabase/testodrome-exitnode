@@ -3,8 +3,9 @@ package repos
 import (
 	"fmt"
 
-	"github.com/petuhovskiy/neon-lights/internal/models"
 	"gorm.io/gorm"
+
+	"github.com/petuhovskiy/neon-lights/internal/models"
 )
 
 type GlobalRuleRepo struct {

@@ -7,13 +7,14 @@ import (
 	"math/rand"
 	"sort"
 
+	"go.uber.org/zap"
+
 	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/bgjobs"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
-	"go.uber.org/zap"
 )
 
 // Rule to delete random projects when there are too many projects with the similar configuration (matrix).

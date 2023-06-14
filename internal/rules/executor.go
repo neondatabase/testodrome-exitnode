@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 
+	"go.uber.org/zap"
+
 	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/rdesc"
-	"go.uber.org/zap"
 )
 
 type ctxkey int

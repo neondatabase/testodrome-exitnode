@@ -8,8 +8,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/petuhovskiy/neon-lights/internal/log"
 	"go.uber.org/zap"
+
+	"github.com/petuhovskiy/neon-lights/internal/log"
 )
 
 // TODO: consider using https://github.com/kislerdm/neon-sdk-go instead
@@ -45,14 +46,15 @@ func (c *Client) sendJSONRequest(ctx context.Context, method string, path string
 		}
 		reader = bytes.NewReader(requestBody)
 	}
-	req, err := http.NewRequest(method, url, reader)
+
+	// TODO: set context
+	req, err := http.NewRequestWithContext(context.Background(), method, url, reader)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", c.authHeader)
 	req.Header.Set("Accept", "application/json")
-	// TODO: set context?
 
 	// TODO: custom client
 	resp, err := http.DefaultClient.Do(req)

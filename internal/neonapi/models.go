@@ -8,7 +8,7 @@ type CreateProjectRequest struct {
 
 type CreateProjectResponse struct {
 	Project        Project         `json:"project"`
-	ConnectionUris []ConnectionUri `json:"connection_uris"`
+	ConnectionUris []ConnectionURI `json:"connection_uris"`
 	Roles          []Role          `json:"roles"`
 	Databases      []Database      `json:"databases"`
 	Operations     []Operation     `json:"operations"`
@@ -50,7 +50,7 @@ type ConnectionParameters struct {
 	PoolerHost string `json:"pooler_host"`
 }
 
-type ConnectionUri struct {
+type ConnectionURI struct {
 	ConnectionURI        string               `json:"connection_uri"`
 	ConnectionParameters ConnectionParameters `json:"connection_parameters"`
 }

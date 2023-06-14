@@ -40,4 +40,11 @@ To use it:
 - Select EnvFile tab
 - Add file .env from repo root
   * On macOS press shirt+cmd+. to display hidden files
+
+### Run a linter
+
+```
+golangci-lint run --fix
+```
+
 </details>
