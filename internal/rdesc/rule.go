@@ -7,7 +7,7 @@ type Act string
 const (
 	ActCreateProject Act = "create_project"
 	ActDeleteProject Act = "delete_project"
-	ActDoGlobalRules Act = "global_rules"
+	ActDoGlobalRules Act = "do_global_rules"
 )
 
 // Rule describes a rule to be run. Can be serialized and deserialized to/from JSON.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/petuhovskiy/neon-lights/internal/app"
+	"github.com/petuhovskiy/neon-lights/internal/bgjobs"
 	"github.com/petuhovskiy/neon-lights/internal/conf"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
@@ -26,6 +27,7 @@ type CreateProject struct {
 	sequence    *repos.Sequence
 	neonClient  *neonapi.Client
 	config      *conf.App
+	register    *bgjobs.Register
 }
 
 type CreateProjectArgs struct {
@@ -47,19 +49,18 @@ func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 		sequence:    a.Repo.SeqExitnodeProject,
 		neonClient:  a.NeonClient,
 		config:      a.Config,
+		register:    a.Register,
 	}, nil
 }
 
 func (c *CreateProject) Execute(ctx context.Context) error {
-	ctx = log.With(ctx, zap.String("rule", "create_project"))
-
 	regions, err := c.regionRepo.FindByProvider(c.provider)
 	if err != nil {
 		return err
 	}
 
 	for _, region := range regions {
-		go c.executeForRegion(ctx, region)
+		c.register.Go(func() { c.executeForRegion(ctx, region) })
 	}
 	return nil
 }

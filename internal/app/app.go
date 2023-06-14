@@ -4,9 +4,11 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
+	"github.com/petuhovskiy/neon-lights/internal/bgjobs"
 	"github.com/petuhovskiy/neon-lights/internal/conf"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
@@ -23,6 +25,7 @@ type App struct {
 	DB         *gorm.DB
 	Repo       *Repos
 	NeonClient *neonapi.Client
+	Register   *bgjobs.Register
 }
 
 func NewAppFromEnv() (*App, error) {
@@ -42,12 +45,14 @@ func NewAppFromEnv() (*App, error) {
 	}
 
 	neonClient := neonapi.NewClient(cfg.Provider, cfg.NeonApiKey)
+	register := bgjobs.NewRegister()
 
 	return &App{
 		Config:     cfg,
 		DB:         db,
 		Repo:       repos,
 		NeonClient: neonClient,
+		Register:   register,
 	}, nil
 }
 
@@ -57,7 +62,7 @@ func (a *App) StartPrometheus() {
 		mux.Handle("/metrics", promhttp.Handler())
 		err := http.ListenAndServe(a.Config.PrometheusBind, mux)
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(nil, "prometheus server error", zap.Error(err))
+			log.Fatal(context.TODO(), "prometheus server error", zap.Error(err))
 		}
 	}()
 }
@@ -67,7 +72,6 @@ func connectDB(cfg *conf.App) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db = db.Debug()
 	return db, nil
 }
 
@@ -75,6 +79,7 @@ type Repos struct {
 	Region             *repos.RegionRepo
 	Project            *repos.ProjectRepo
 	Sequence           *repos.SequenceRepo
+	GlobalRule         *repos.GlobalRuleRepo
 	SeqExitnodeProject *repos.Sequence
 }
 
@@ -83,14 +88,20 @@ func createRepos(db *gorm.DB, cfg *conf.App) (*Repos, error) {
 		&models.Region{},
 		&models.Project{},
 		&models.Sequence{},
+		&models.GlobalRule{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate: %w", err)
 	}
 
+	if cfg.DbDebug {
+		db = db.Debug()
+	}
+
 	regionRepo := repos.NewRegionRepo(db)
 	projectRepo := repos.NewProjectRepo(db)
 	sequenceRepo := repos.NewSequenceRepo(db)
+	globalRuleRepo := repos.NewGlobalRuleRepo(db)
 
 	exitnodeSeq, err := sequenceRepo.Get(fmt.Sprintf("exitnode-%s-project", cfg.Exitnode))
 	if err != nil {
@@ -101,6 +112,7 @@ func createRepos(db *gorm.DB, cfg *conf.App) (*Repos, error) {
 		Region:             regionRepo,
 		Project:            projectRepo,
 		Sequence:           sequenceRepo,
+		GlobalRule:         globalRuleRepo,
 		SeqExitnodeProject: exitnodeSeq,
 	}, nil
 }

@@ -15,12 +15,14 @@ type RuleImpl interface {
 	Execute(ctx context.Context) error
 }
 
-func loadImpl(base *app.App, desc rdesc.Rule) (RuleImpl, error) {
+func loadImpl(base *app.App, executor *Executor, desc rdesc.Rule) (RuleImpl, error) {
 	switch desc.Act {
 	case rdesc.ActCreateProject:
 		return NewCreateProject(base, desc.Args)
 	case rdesc.ActDeleteProject:
 		return NewDeleteProject(base, desc.Args)
+	case rdesc.ActDoGlobalRules:
+		return NewDoGlobalRules(base, executor, desc.Args)
 	default:
 		return nil, fmt.Errorf("unknown rule act %s: %w", desc.Act, ErrUnknownRule)
 	}

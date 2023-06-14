@@ -16,15 +16,15 @@ const (
 	ctxkeyInsidePeriodic ctxkey = iota
 )
 
-type GlobalExecutor struct {
+type Executor struct {
 	base *app.App
 }
 
-func NewGlobalExecutor(base *app.App) *GlobalExecutor {
-	return &GlobalExecutor{base: base}
+func NewExecutor(base *app.App) *Executor {
+	return &Executor{base: base}
 }
 
-func (e *GlobalExecutor) ParseJSON(data json.RawMessage) (*Rule, error) {
+func (e *Executor) ParseJSON(data json.RawMessage) (*Rule, error) {
 	var desc rdesc.Rule
 	err := json.Unmarshal(data, &desc)
 	if err != nil {
@@ -34,8 +34,8 @@ func (e *GlobalExecutor) ParseJSON(data json.RawMessage) (*Rule, error) {
 	return e.CreateFromDesc(desc)
 }
 
-func (e *GlobalExecutor) CreateFromDesc(desc rdesc.Rule) (*Rule, error) {
-	impl, err := loadImpl(e.base, desc)
+func (e *Executor) CreateFromDesc(desc rdesc.Rule) (*Rule, error) {
+	impl, err := loadImpl(e.base, e, desc)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (e *GlobalExecutor) CreateFromDesc(desc rdesc.Rule) (*Rule, error) {
 	return newRule(desc, impl)
 }
 
-func (e *GlobalExecutor) Execute(ctx context.Context, r *Rule) error {
+func (e *Executor) Execute(ctx context.Context, r *Rule) error {
 	var insidePeriodic bool
 	if val, ok := ctx.Value(ctxkeyInsidePeriodic).(bool); ok {
 		insidePeriodic = val
@@ -57,12 +57,12 @@ func (e *GlobalExecutor) Execute(ctx context.Context, r *Rule) error {
 	return e.executeOnce(ctx, r)
 }
 
-func (e *GlobalExecutor) executeOnce(ctx context.Context, r *Rule) error {
+func (e *Executor) executeOnce(ctx context.Context, r *Rule) error {
 	ctx = log.Into(ctx, string(r.desc.Act))
 	return r.impl.Execute(ctx)
 }
 
-func (e *GlobalExecutor) executePeriodic(ctx context.Context, r *Rule, period *Period) error {
+func (e *Executor) executePeriodic(ctx context.Context, r *Rule, period *Period) error {
 	ctx = context.WithValue(ctx, ctxkeyInsidePeriodic, true)
 	ctx = log.Into(ctx, "periodic")
 

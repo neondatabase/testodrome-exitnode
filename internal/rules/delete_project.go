@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/petuhovskiy/neon-lights/internal/app"
+	"github.com/petuhovskiy/neon-lights/internal/bgjobs"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
 	"github.com/petuhovskiy/neon-lights/internal/neonapi"
@@ -25,6 +26,7 @@ type DeleteProject struct {
 	regionRepo  *repos.RegionRepo
 	projectRepo *repos.ProjectRepo
 	neonClient  *neonapi.Client
+	register    *bgjobs.Register
 }
 
 type DeleteProjectArgs struct {
@@ -44,19 +46,18 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 		regionRepo:  a.Repo.Region,
 		projectRepo: a.Repo.Project,
 		neonClient:  a.NeonClient,
+		register:    a.Register,
 	}, nil
 }
 
 func (c *DeleteProject) Execute(ctx context.Context) error {
-	ctx = log.With(ctx, zap.String("rule", "delete_project"))
-
 	regions, err := c.regionRepo.FindByProvider(c.provider)
 	if err != nil {
 		return err
 	}
 
 	for _, region := range regions {
-		go c.executeForRegion(ctx, region)
+		c.register.Go(func() { c.executeForRegion(ctx, region) })
 	}
 	return nil
 }
