@@ -81,6 +81,7 @@ type Repos struct {
 	Project            *repos.ProjectRepo
 	Sequence           *repos.SequenceRepo
 	GlobalRule         *repos.GlobalRuleRepo
+	Query              *repos.QueryRepo
 	SeqExitnodeProject *repos.Sequence
 }
 
@@ -90,6 +91,7 @@ func createRepos(db *gorm.DB, cfg *conf.App) (*Repos, error) {
 		&models.Project{},
 		&models.Sequence{},
 		&models.GlobalRule{},
+		&models.Query{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate: %w", err)
@@ -103,6 +105,7 @@ func createRepos(db *gorm.DB, cfg *conf.App) (*Repos, error) {
 	projectRepo := repos.NewProjectRepo(db)
 	sequenceRepo := repos.NewSequenceRepo(db)
 	globalRuleRepo := repos.NewGlobalRuleRepo(db)
+	queryRepo := repos.NewQueryRepo(db)
 
 	exitnodeSeq, err := sequenceRepo.Get(fmt.Sprintf("exitnode-%s-project", cfg.Exitnode))
 	if err != nil {
@@ -114,6 +117,7 @@ func createRepos(db *gorm.DB, cfg *conf.App) (*Repos, error) {
 		Project:            projectRepo,
 		Sequence:           sequenceRepo,
 		GlobalRule:         globalRuleRepo,
+		Query:              queryRepo,
 		SeqExitnodeProject: exitnodeSeq,
 	}, nil
 }

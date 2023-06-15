@@ -136,3 +136,32 @@ type CreateProject struct {
 	// TODO: add PgVersion to the matrix
 	// PgVersion int    `json:"pg_version"`
 }
+
+type DeleteProjectResponse struct {
+	Project struct {
+		DataStorageBytesHour        int       `json:"data_storage_bytes_hour"`
+		DataTransferBytes           int       `json:"data_transfer_bytes"`
+		WrittenDataBytes            int       `json:"written_data_bytes"`
+		ComputeTimeSeconds          int       `json:"compute_time_seconds"`
+		ActiveTimeSeconds           int       `json:"active_time_seconds"`
+		CPUUsedSec                  int       `json:"cpu_used_sec"`
+		ID                          string    `json:"id"`
+		PlatformID                  string    `json:"platform_id"`
+		RegionID                    string    `json:"region_id"`
+		Name                        string    `json:"name"`
+		Provisioner                 string    `json:"provisioner"`
+		PgVersion                   int       `json:"pg_version"`
+		ProxyHost                   string    `json:"proxy_host"`
+		BranchLogicalSizeLimit      int       `json:"branch_logical_size_limit"`
+		BranchLogicalSizeLimitBytes int64     `json:"branch_logical_size_limit_bytes"`
+		StorePasswords              bool      `json:"store_passwords"`
+		CreationSource              string    `json:"creation_source"`
+		HistoryRetentionSeconds     int       `json:"history_retention_seconds"`
+		CreatedAt                   time.Time `json:"created_at"`
+		UpdatedAt                   time.Time `json:"updated_at"`
+		SyntheticStorageSize        int       `json:"synthetic_storage_size"`
+		ConsumptionPeriodStart      time.Time `json:"consumption_period_start"`
+		ConsumptionPeriodEnd        time.Time `json:"consumption_period_end"`
+		OwnerID                     string    `json:"owner_id"`
+	} `json:"project"`
+}

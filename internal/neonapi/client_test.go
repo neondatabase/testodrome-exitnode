@@ -22,13 +22,18 @@ func TestCreateProject(t *testing.T) {
 	ctx := context.Background()
 
 	client := testClient(t)
-	resp, err := client.CreateProject(ctx, &CreateProject{
+	prep, err := client.CreateProject(&CreateProject{
 		Name:     "test-project-1",
 		RegionID: "aws-eu-west-1",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	resp, result, err := prep.Do(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Logf("Project ID: %s", resp.Project.ID)
+	t.Logf("Result: %#+v", result)
 }

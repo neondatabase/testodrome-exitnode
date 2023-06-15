@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -26,8 +27,10 @@ type DeleteProject struct {
 	provider    string
 	regionRepo  *repos.RegionRepo
 	projectRepo *repos.ProjectRepo
+	queryRepo   *repos.QueryRepo
 	neonClient  *neonapi.Client
 	register    *bgjobs.Register
+	exitnode    string
 }
 
 type DeleteProjectArgs struct {
@@ -46,8 +49,10 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 		provider:    a.Config.Provider,
 		regionRepo:  a.Repo.Region,
 		projectRepo: a.Repo.Project,
+		queryRepo:   a.Repo.Query,
 		neonClient:  a.NeonClient,
 		register:    a.Register,
+		exitnode:    a.Config.Exitnode,
 	}, nil
 }
 
@@ -105,14 +110,40 @@ func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Regi
 
 // Delete a project.
 func (c *DeleteProject) deleteProject(ctx context.Context, projectDB *models.Project) error {
-	// calling a delete API
-	err := c.neonClient.DeleteProject(ctx, projectDB.ProjectID)
+	// TODO: kill background jobs for this project and wait for them to finish
+
+	// preparing a query
+	prep, err := c.neonClient.DeleteProject(projectDB.ProjectID)
 	if err != nil {
-		// TODO: retry, otherwise state will be inconsistent
 		return err
 	}
 
+	dbQuery := prep.Query(&projectDB.ID, projectDB.RegionID, c.exitnode)
+
+	// 1. save delete_project query to db
+	err = c.queryRepo.Save(dbQuery)
+	if err != nil {
+		return fmt.Errorf("failed to perist delete_project query: %w", err)
+	}
+
+	// 2. set deleted_at in db
 	err = c.projectRepo.Delete(projectDB)
+	if err != nil {
+		return err
+	}
+
+	// 3. call API
+	_, result, err := prep.Do(ctx)
+
+	dbErr := c.queryRepo.FinishSaveResult(dbQuery, result)
+	if dbErr != nil {
+		log.Error(ctx, "failed to persist query result", zap.Error(dbErr))
+		if err == nil {
+			err = dbErr
+		} else {
+			err = errors.Join(err, dbErr)
+		}
+	}
 	if err != nil {
 		return err
 	}

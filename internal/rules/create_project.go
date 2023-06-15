@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -25,6 +26,7 @@ type CreateProject struct {
 	provider    string
 	regionRepo  *repos.RegionRepo
 	projectRepo *repos.ProjectRepo
+	queryRepo   *repos.QueryRepo
 	sequence    *repos.Sequence
 	neonClient  *neonapi.Client
 	config      *conf.App
@@ -47,6 +49,7 @@ func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 		provider:    a.Config.Provider,
 		regionRepo:  a.Repo.Region,
 		projectRepo: a.Repo.Project,
+		queryRepo:   a.Repo.Query,
 		sequence:    a.Repo.SeqExitnodeProject,
 		neonClient:  a.NeonClient,
 		config:      a.Config,
@@ -100,10 +103,36 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 		RegionID: region.DatabaseRegion,
 	}
 
-	project, err := c.neonClient.CreateProject(ctx, createRequest)
+	prep, err := c.neonClient.CreateProject(createRequest)
 	if err != nil {
 		return err
 	}
+
+	dbQuery := prep.Query(nil, region.ID, c.config.Exitnode)
+	err = c.queryRepo.Save(dbQuery)
+	if err != nil {
+		return fmt.Errorf("failed to persist query: %w", err)
+	}
+
+	project, result, err := prep.Do(ctx)
+	dbErr := c.queryRepo.FinishSaveResult(dbQuery, result)
+
+	// 1. save response to the database
+	if dbErr != nil {
+		log.Error(ctx, "failed to persist query result", zap.Error(dbErr))
+		if err == nil {
+			err = dbErr
+		} else {
+			err = errors.Join(err, dbErr)
+		}
+	}
+
+	// 2. handle error
+	if err != nil {
+		return err
+	}
+
+	// 3. process the response
 	ctx = log.With(ctx, zap.String("projectID", project.Project.ID))
 
 	var connstr string
