@@ -64,6 +64,7 @@ func (c *CreateProject) Execute(ctx context.Context) error {
 	}
 
 	for _, region := range regions {
+		region := region
 		c.register.Go(func() { c.executeForRegion(ctx, region) })
 	}
 	return nil

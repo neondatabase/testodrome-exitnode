@@ -8,6 +8,7 @@ const (
 	ActCreateProject Act = "create_project"
 	ActDeleteProject Act = "delete_project"
 	ActDoGlobalRules Act = "do_global_rules"
+	ActQueryProject  Act = "query_project"
 )
 
 // Rule describes a rule to be run. Can be serialized and deserialized to/from JSON.
