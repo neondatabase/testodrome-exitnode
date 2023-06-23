@@ -25,3 +25,15 @@ func (r *QueryRepo) Save(query *models.Query) error {
 func (r *QueryRepo) FinishSaveResult(query *models.Query, upd *models.QueryResult) error {
 	return r.db.Model(query).Updates(upd).Error
 }
+
+func (r *QueryRepo) FetchLastQueries(projectID uint, limit int) ([]models.Query, error) {
+	var queries []models.Query
+	err := r.db.
+		Where("project_id = ?", projectID).
+		Order("id DESC").
+		Limit(limit).
+		Find(&queries).
+		Error
+
+	return queries, err
+}

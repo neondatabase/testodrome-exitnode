@@ -21,8 +21,7 @@ import (
 // Rule to delete random projects when there are too many projects with the similar configuration (matrix).
 // TODO: make it work with custom matrix, not only per-region.
 type DeleteProject struct {
-	// Target number of projects. Project will be deleted if there are more than this number of projects.
-	projectsN int
+	args DeleteProjectArgs
 	// Projects will be deleted only in regions with this provider.
 	provider    string
 	regionRepo  *repos.RegionRepo
@@ -34,7 +33,21 @@ type DeleteProject struct {
 }
 
 type DeleteProjectArgs struct {
-	N int
+	// Target number of projects. Project will be deleted if there are more than this number of projects.
+	N                 int
+	SkipFailedQueries *SkipFailedQueries
+}
+
+type SkipFailedQueries struct {
+	// If true, projects with last failed or unfinished queries will not be deleted.
+	Enabled bool
+	// Number of last queries to check.
+	QueriesN int
+}
+
+var defaultSkipFailedQueries = SkipFailedQueries{
+	Enabled:  true,
+	QueriesN: 3,
 }
 
 func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
@@ -44,8 +57,12 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 		return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 	}
 
+	if args.SkipFailedQueries == nil {
+		args.SkipFailedQueries = &defaultSkipFailedQueries
+	}
+
 	return &DeleteProject{
-		projectsN:   args.N,
+		args:        args,
 		provider:    a.Config.Provider,
 		regionRepo:  a.Repo.Region,
 		projectRepo: a.Repo.Project,
@@ -80,7 +97,7 @@ func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Regi
 		return
 	}
 
-	if len(projects) <= c.projectsN {
+	if len(projects) <= c.args.N {
 		return
 	}
 
@@ -90,7 +107,7 @@ func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Regi
 	})
 
 	// take any N projects
-	projects = projects[:c.projectsN]
+	projects = projects[:c.args.N]
 
 	// sort by creation date
 	sort.Slice(projects, func(i, j int) bool {
@@ -112,6 +129,13 @@ func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Regi
 // Delete a project.
 func (c *DeleteProject) deleteProject(ctx context.Context, projectDB *models.Project) error {
 	// TODO: kill background jobs for this project and wait for them to finish
+
+	if c.args.SkipFailedQueries.Enabled {
+		err := c.hasRecentFailedQueries(projectDB)
+		if err != nil {
+			return err
+		}
+	}
 
 	// preparing a query
 	prep, err := c.neonClient.DeleteProject(projectDB.ProjectID)
@@ -150,5 +174,20 @@ func (c *DeleteProject) deleteProject(ctx context.Context, projectDB *models.Pro
 	}
 
 	log.Info(ctx, "project deleted")
+	return nil
+}
+
+// Returns error if there are recent failed queries for this project.
+func (c *DeleteProject) hasRecentFailedQueries(projectDB *models.Project) error {
+	res, err := c.queryRepo.FetchLastQueries(projectDB.ID, c.args.SkipFailedQueries.QueriesN)
+	if err != nil {
+		return fmt.Errorf("error while fetching recent queries: %w", err)
+	}
+
+	for _, q := range res {
+		if q.IsFailed || !q.IsFinished {
+			return fmt.Errorf("recent query prevents deletion, id=%d", q.ID)
+		}
+	}
 	return nil
 }
