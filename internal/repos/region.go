@@ -16,13 +16,16 @@ func NewRegionRepo(db *gorm.DB) *RegionRepo {
 	}
 }
 
-// FindByProvider returns all regions with the given provider.
-func (r *RegionRepo) FindByProvider(providerName string) ([]models.Region, error) {
+// Find returns all region filtered by the given filters.
+func (r *RegionRepo) Find(filters []Filter) ([]models.Region, error) {
 	var regions []models.Region
-	err := r.db.
-		Where("provider = ?", providerName).
-		Find(&regions).
-		Error
+
+	db := r.db
+	for _, filter := range filters {
+		db = filter.Apply(db)
+	}
+
+	err := db.Find(&regions).Error
 	if err != nil {
 		return nil, err
 	}

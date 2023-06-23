@@ -18,9 +18,7 @@ import (
 
 // Rule to send random queries to random projects.
 type QueryProject struct {
-	// Projects will be queried only in regions with this provider.
-	// TODO: make custom filters already
-	provider      string
+	regionFilters []repos.Filter
 	regionRepo    *repos.RegionRepo
 	projectRepo   *repos.ProjectRepo
 	queryRepo     *repos.QueryRepo
@@ -40,7 +38,7 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 	}
 
 	return &QueryProject{
-		provider:      a.Config.Provider,
+		regionFilters: a.RegionFilters,
 		regionRepo:    a.Repo.Region,
 		projectRepo:   a.Repo.Project,
 		queryRepo:     a.Repo.Query,
@@ -51,7 +49,7 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 }
 
 func (r *QueryProject) Execute(ctx context.Context) error {
-	regions, err := r.regionRepo.FindByProvider(r.provider)
+	regions, err := r.regionRepo.Find(r.regionFilters)
 	if err != nil {
 		return err
 	}

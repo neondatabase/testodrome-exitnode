@@ -28,6 +28,7 @@ type App struct {
 	NeonClient    *neonapi.Client
 	Register      *bgjobs.Register
 	ProjectLocker *bgjobs.ProjectLocker
+	RegionFilters []repos.Filter
 }
 
 func NewAppFromEnv() (*App, error) {
@@ -35,6 +36,14 @@ func NewAppFromEnv() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config from env: %w", err)
 	}
+
+	regionFilters := []repos.Filter{
+		repos.FilterByRegionProvider(cfg.Provider),
+	}
+	if cfg.RegionFilters != "" {
+		regionFilters = append(regionFilters, repos.RawFilter(cfg.RegionFilters))
+	}
+	log.Info(context.Background(), "using region filters", zap.Any("filters", regionFilters))
 
 	db, err := connectDB(cfg)
 	if err != nil {
@@ -57,6 +66,7 @@ func NewAppFromEnv() (*App, error) {
 		NeonClient:    neonClient,
 		Register:      register,
 		ProjectLocker: projectLocker,
+		RegionFilters: regionFilters,
 	}, nil
 }
 

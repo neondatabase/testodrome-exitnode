@@ -18,7 +18,8 @@ go mod download
 go run main.go
 
 # read .env and run the code
-export $(cat .env | xargs) && go run main.go | tee -a app.log
+set -a; source .env; set +a
+go run main.go | tee -a app.log
 
 # now program should be running without errors, until Ctrl+C is pressed
 ```

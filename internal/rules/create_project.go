@@ -22,15 +22,15 @@ import (
 // Rule to create a project in every region at least once per `interval` minutes.
 type CreateProject struct {
 	interval time.Duration
-	// Projects will be created only in regions with this provider.
-	provider    string
-	regionRepo  *repos.RegionRepo
-	projectRepo *repos.ProjectRepo
-	queryRepo   *repos.QueryRepo
-	sequence    *repos.Sequence
-	neonClient  *neonapi.Client
-	config      *conf.App
-	register    *bgjobs.Register
+	// Projects will be created only in regions adhering to these filters.
+	regionFilters []repos.Filter
+	regionRepo    *repos.RegionRepo
+	projectRepo   *repos.ProjectRepo
+	queryRepo     *repos.QueryRepo
+	sequence      *repos.Sequence
+	neonClient    *neonapi.Client
+	config        *conf.App
+	register      *bgjobs.Register
 }
 
 type CreateProjectArgs struct {
@@ -45,20 +45,20 @@ func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 	}
 
 	return &CreateProject{
-		interval:    args.Interval.Duration,
-		provider:    a.Config.Provider,
-		regionRepo:  a.Repo.Region,
-		projectRepo: a.Repo.Project,
-		queryRepo:   a.Repo.Query,
-		sequence:    a.Repo.SeqExitnodeProject,
-		neonClient:  a.NeonClient,
-		config:      a.Config,
-		register:    a.Register,
+		interval:      args.Interval.Duration,
+		regionFilters: a.RegionFilters,
+		regionRepo:    a.Repo.Region,
+		projectRepo:   a.Repo.Project,
+		queryRepo:     a.Repo.Query,
+		sequence:      a.Repo.SeqExitnodeProject,
+		neonClient:    a.NeonClient,
+		config:        a.Config,
+		register:      a.Register,
 	}, nil
 }
 
 func (c *CreateProject) Execute(ctx context.Context) error {
-	regions, err := c.regionRepo.FindByProvider(c.provider)
+	regions, err := c.regionRepo.Find(c.regionFilters)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,6 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 		return err
 	}
 
-	// TODO: store information about project creation API query in the database.
 	createRequest := &neonapi.CreateProject{
 		Name:     fmt.Sprintf("test@%s-%d", c.config.Exitnode, projectSeqID),
 		RegionID: region.DatabaseRegion,

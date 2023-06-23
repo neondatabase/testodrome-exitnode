@@ -21,9 +21,8 @@ import (
 // Rule to delete random projects when there are too many projects with the similar configuration (matrix).
 // TODO: make it work with custom matrix, not only per-region.
 type DeleteProject struct {
-	args DeleteProjectArgs
-	// Projects will be deleted only in regions with this provider.
-	provider      string
+	args          DeleteProjectArgs
+	regionFilters []repos.Filter
 	regionRepo    *repos.RegionRepo
 	projectRepo   *repos.ProjectRepo
 	queryRepo     *repos.QueryRepo
@@ -64,7 +63,7 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 
 	return &DeleteProject{
 		args:          args,
-		provider:      a.Config.Provider,
+		regionFilters: a.RegionFilters,
 		regionRepo:    a.Repo.Region,
 		projectRepo:   a.Repo.Project,
 		queryRepo:     a.Repo.Query,
@@ -76,7 +75,7 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 }
 
 func (c *DeleteProject) Execute(ctx context.Context) error {
-	regions, err := c.regionRepo.FindByProvider(c.provider)
+	regions, err := c.regionRepo.Find(c.regionFilters)
 	if err != nil {
 		return err
 	}

@@ -21,6 +21,11 @@ type App struct {
 
 	// DebugDB enables debug mode for the database.
 	DebugDB bool `env:"DB_DEBUG" envDefault:"false"`
+
+	// All queries will use these filters. One example of the default filter is:
+	// regions.provider = $PROVIDER
+	// That filter is always enabled.
+	RegionFilters string `env:"REGION_FILTERS"`
 }
 
 func ParseEnv() (*App, error) {
