@@ -40,30 +40,46 @@ type slQueryResponse struct {
 	DurationNs *int64     `json:"durationNs"`
 }
 
-// Single query to the driver.
-type SingleQuery struct {
-	Query  string `json:"query"`
-	Params []any  `json:"params"`
-}
+var _ Driver = (*VercelSL)(nil)
+var _ ManyQueriesDriver = (*VercelSL)(nil)
 
 // VercelSL is `@neondatabase/serverless` deployed on Vercel.
 type VercelSL struct {
-	projectID uint
-	regionID  uint
-	connstr   string
-	apiURL    string
+	saver   QuerySaver
+	connstr string
+	apiURL  string
 }
 
-func NewVercelSL(project *models.Project) *VercelSL {
+func NewVercelSL(connstr string, saver QuerySaver) *VercelSL {
 	return &VercelSL{
-		projectID: project.ID,
-		regionID:  project.RegionID,
-		connstr:   project.ConnectionString,
-		apiURL:    defaultAPIURL,
+		connstr: connstr,
+		apiURL:  defaultAPIURL,
+		saver:   saver,
 	}
 }
 
+func (s *VercelSL) Query(ctx context.Context, singleQuery SingleQuery) (*models.Query, error) {
+	res, err := s.Queries(ctx, singleQuery)
+	var q *models.Query
+	if len(res) == 1 {
+		q = &res[0]
+	}
+	return q, err
+}
+
 func (s *VercelSL) Queries(ctx context.Context, queries ...SingleQuery) ([]models.Query, error) {
+	res, err := s.queries(ctx, queries...)
+
+	for i := range res {
+		if err2 := saveQuery(s.saver, &res[i], err); err2 != nil {
+			return res, err2
+		}
+	}
+
+	return res, err
+}
+
+func (s *VercelSL) queries(ctx context.Context, queries ...SingleQuery) ([]models.Query, error) {
 	slReq := slRequest{
 		ConnStr: s.connstr,
 		Queries: queries,
@@ -107,14 +123,12 @@ func (s *VercelSL) Queries(ctx context.Context, queries ...SingleQuery) ([]model
 
 func (s *VercelSL) convert(slQuery slQueryResponse) models.Query {
 	return models.Query{
-		ProjectID: &s.projectID,
-		RegionID:  s.regionID,
-		Exitnode:  slQuery.Exitnode,
-		Kind:      models.QueryDestination(slQuery.Kind),
-		Addr:      slQuery.Addr,
-		Driver:    slQuery.Driver,
-		Method:    slQuery.Method,
-		Request:   slQuery.Request,
+		Exitnode: slQuery.Exitnode,
+		Kind:     models.QueryDestination(slQuery.Kind),
+		Addr:     slQuery.Addr,
+		Driver:   slQuery.Driver,
+		Method:   slQuery.Method,
+		Request:  slQuery.Request,
 		QueryResult: models.QueryResult{
 			IsFinished: true,
 			Response:   slQuery.Response,

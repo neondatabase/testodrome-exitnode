@@ -3,7 +3,6 @@ package rules
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
 
@@ -80,10 +79,39 @@ func (r *QueryProject) executeForRegion(ctx context.Context, region models.Regio
 	}
 }
 
+func (r *QueryProject) randomDriver(ctx context.Context, project models.Project) (drivers.Driver, error) {
+	// save queries to the database with project and exitnode info
+	saver := repos.NewQuerySaver(r.queryRepo, repos.QuerySaverArgs{
+		ProjectID: &project.ID,
+		Exitnode:  &r.exitnode,
+		RegionID:  &project.RegionID,
+	})
+
+	num := rand.Intn(3)
+	switch num {
+	case 0:
+		log.Info(ctx, "using serverless driver")
+		return drivers.NewServerless(project.ConnectionString, saver)
+	case 1:
+		log.Info(ctx, "using vercel-sl driver")
+		return drivers.NewVercelSL(project.ConnectionString, saver), nil
+	case 2:
+		log.Info(ctx, "using pgx driver")
+		return drivers.PgxConnect(ctx, project.ConnectionString, saver)
+	}
+
+	panic("unreachable")
+}
+
 // Execute a random query for a single project.
 func (r *QueryProject) executeForProject(ctx context.Context, project models.Project) error {
 	ctx = log.With(ctx, zap.Uint("projectID", project.ID))
 	// TODO: use a library to select random query and random driver
+
+	driver, err1 := r.randomDriver(ctx, project)
+	if err1 != nil {
+		return fmt.Errorf("failed to create driver: %w", err1)
+	}
 
 	const select1 = `SELECT 1`
 	const createTable = `CREATE TABLE IF NOT EXISTS activity_v1 (
@@ -103,54 +131,23 @@ func (r *QueryProject) executeForProject(ctx context.Context, project models.Pro
 		{Query: doActivity, Params: []any{rand.Int63()}},
 	}
 
-	driver := rand.Intn(2)
-	if driver == 0 {
-		return r.goServerlessDriver(ctx, project, queries)
+	var res []models.Query
+	var err error
+	if md, ok := driver.(drivers.ManyQueriesDriver); ok {
+		res, err = md.Queries(ctx, queries...)
 	} else {
-		return r.vercelSLDriver(ctx, project, queries)
-	}
-}
-
-func (r *QueryProject) goServerlessDriver(ctx context.Context, project models.Project, queries []drivers.SingleQuery) error {
-	driver, err1 := drivers.NewServerless(r.exitnode, &project)
-	if err1 != nil {
-		return err1
-	}
-
-	for _, q := range queries {
-		query, err2 := driver.Query(ctx, q.Query, q.Params...)
-		if err := r.saveQuery(query, err2); err != nil {
-			return err
+		for _, q := range queries {
+			query, err2 := driver.Query(ctx, q)
+			if query != nil {
+				res = append(res, *query)
+			}
+			if err2 != nil {
+				err = err2
+				break
+			}
 		}
 	}
 
-	return nil
-}
-
-func (r *QueryProject) vercelSLDriver(ctx context.Context, project models.Project, queries []drivers.SingleQuery) error {
-	driver := drivers.NewVercelSL(&project)
-	res, err2 := driver.Queries(ctx, queries...)
-
-	for _, q := range res {
-		q := q
-		if err := r.saveQuery(&q, err2); err != nil {
-			return err
-		}
-	}
-
-	return err2
-}
-
-func (r *QueryProject) saveQuery(query *models.Query, queryErr error) (retErr error) {
-	retErr = queryErr
-
-	if err := r.queryRepo.Save(query); err != nil {
-		if retErr == nil {
-			retErr = err
-		} else {
-			retErr = errors.Join(retErr, err)
-		}
-	}
-
-	return retErr
+	_ = res
+	return err
 }

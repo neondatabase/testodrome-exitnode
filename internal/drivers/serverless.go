@@ -18,24 +18,22 @@ type hosRequest struct {
 	Params []any  `json:"params"`
 }
 
+var _ Driver = (*Serverless)(nil)
+
 // SQL-over-HTTP driver.
 type Serverless struct {
-	projectID uint
-	regionID  uint
-	exitnode  string
-	connstr   *url.URL
+	connstr *url.URL
+	saver   QuerySaver
 }
 
-func NewServerless(exitnode string, project *models.Project) (*Serverless, error) {
-	connstr, err := url.Parse(project.ConnectionString)
+func NewServerless(connectionString string, saver QuerySaver) (*Serverless, error) {
+	connstr, err := url.Parse(connectionString)
 	if err != nil {
 		return nil, err
 	}
 	return &Serverless{
-		projectID: project.ID,
-		regionID:  project.RegionID,
-		exitnode:  exitnode,
-		connstr:   connstr,
+		connstr: connstr,
+		saver:   saver,
 	}, nil
 }
 
@@ -43,7 +41,14 @@ func (s *Serverless) httpURL() string {
 	return fmt.Sprintf("https://%s/sql", s.connstr.Hostname())
 }
 
-func (s *Serverless) Query(ctx context.Context, query string, params ...any) (retQuery *models.Query, retErr error) {
+func (s *Serverless) Query(ctx context.Context, singleQuery SingleQuery) (*models.Query, error) {
+	q, err := s.query(ctx, singleQuery)
+	return q, saveQuery(s.saver, q, err)
+}
+
+func (s *Serverless) query(ctx context.Context, singleQuery SingleQuery) (retQuery *models.Query, retErr error) {
+	query := singleQuery.Query
+	params := singleQuery.Params
 	if params == nil {
 		params = []any{}
 	}
@@ -57,17 +62,13 @@ func (s *Serverless) Query(ctx context.Context, query string, params ...any) (re
 		return nil, err
 	}
 
-	retQuery = &models.Query{
-		ProjectID:   &s.projectID,
-		RegionID:    s.regionID,
-		Exitnode:    s.exitnode,
-		Kind:        models.QueryDB,
-		Addr:        s.connstr.String(),
-		Driver:      "go-serverless",
-		Method:      "sql-over-http",
-		Request:     string(requestBody),
-		QueryResult: models.QueryResult{},
-	}
+	retQuery = startQuery(
+		models.QueryDB,
+		s.connstr.String(),
+		"go-serverless",
+		"sql-over-http",
+		string(requestBody),
+	)
 
 	defer func() {
 		if retErr != nil {
