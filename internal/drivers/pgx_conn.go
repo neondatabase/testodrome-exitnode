@@ -55,6 +55,7 @@ func (c *PgxConnection) Query(ctx context.Context, req SingleQuery) (*models.Que
 		"query",
 		string(jsonReq),
 	)
+	query.RelatedQueryID = &c.connQuery.ID
 
 	rows, err1 := c.conn.Query(ctx, req.Query, req.Params...)
 	// rows are always non-nil

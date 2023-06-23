@@ -25,6 +25,9 @@ type Query struct {
 	// The node that executed the query.
 	Exitnode string
 
+	// Usually refers to a connection establishment query.
+	RelatedQueryID *uint
+
 	// Query to "api" or "db".
 	Kind QueryDestination
 
