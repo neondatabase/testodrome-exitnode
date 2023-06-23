@@ -22,11 +22,12 @@ import (
 )
 
 type App struct {
-	Config     *conf.App
-	DB         *gorm.DB
-	Repo       *Repos
-	NeonClient *neonapi.Client
-	Register   *bgjobs.Register
+	Config        *conf.App
+	DB            *gorm.DB
+	Repo          *Repos
+	NeonClient    *neonapi.Client
+	Register      *bgjobs.Register
+	ProjectLocker *bgjobs.ProjectLocker
 }
 
 func NewAppFromEnv() (*App, error) {
@@ -47,13 +48,15 @@ func NewAppFromEnv() (*App, error) {
 
 	neonClient := neonapi.NewClient(cfg.Provider, cfg.NeonAPIKey)
 	register := bgjobs.NewRegister()
+	projectLocker := bgjobs.NewProjectLocker()
 
 	return &App{
-		Config:     cfg,
-		DB:         db,
-		Repo:       repo,
-		NeonClient: neonClient,
-		Register:   register,
+		Config:        cfg,
+		DB:            db,
+		Repo:          repo,
+		NeonClient:    neonClient,
+		Register:      register,
+		ProjectLocker: projectLocker,
 	}, nil
 }
 

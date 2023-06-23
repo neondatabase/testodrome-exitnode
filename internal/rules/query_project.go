@@ -20,12 +20,13 @@ import (
 type QueryProject struct {
 	// Projects will be queried only in regions with this provider.
 	// TODO: make custom filters already
-	provider    string
-	regionRepo  *repos.RegionRepo
-	projectRepo *repos.ProjectRepo
-	queryRepo   *repos.QueryRepo
-	register    *bgjobs.Register
-	exitnode    string
+	provider      string
+	regionRepo    *repos.RegionRepo
+	projectRepo   *repos.ProjectRepo
+	queryRepo     *repos.QueryRepo
+	register      *bgjobs.Register
+	exitnode      string
+	projectLocker *bgjobs.ProjectLocker
 }
 
 type QueryProjectArgs struct {
@@ -39,12 +40,13 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 	}
 
 	return &QueryProject{
-		provider:    a.Config.Provider,
-		regionRepo:  a.Repo.Region,
-		projectRepo: a.Repo.Project,
-		queryRepo:   a.Repo.Query,
-		register:    a.Register,
-		exitnode:    a.Config.Exitnode,
+		provider:      a.Config.Provider,
+		regionRepo:    a.Repo.Region,
+		projectRepo:   a.Repo.Project,
+		queryRepo:     a.Repo.Query,
+		register:      a.Register,
+		exitnode:      a.Config.Exitnode,
+		projectLocker: a.ProjectLocker,
 	}, nil
 }
 
@@ -106,6 +108,14 @@ func (r *QueryProject) randomDriver(ctx context.Context, project models.Project)
 // Execute a random query for a single project.
 func (r *QueryProject) executeForProject(ctx context.Context, project models.Project) error {
 	ctx = log.With(ctx, zap.Uint("projectID", project.ID))
+	projectLock := r.projectLocker.Get(project.ID)
+
+	unlock := projectLock.TrySharedLock()
+	if unlock == nil {
+		return fmt.Errorf("project is locked")
+	}
+	defer unlock()
+
 	// TODO: use a library to select random query and random driver
 
 	driver, err1 := r.randomDriver(ctx, project)

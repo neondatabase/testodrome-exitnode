@@ -23,13 +23,14 @@ import (
 type DeleteProject struct {
 	args DeleteProjectArgs
 	// Projects will be deleted only in regions with this provider.
-	provider    string
-	regionRepo  *repos.RegionRepo
-	projectRepo *repos.ProjectRepo
-	queryRepo   *repos.QueryRepo
-	neonClient  *neonapi.Client
-	register    *bgjobs.Register
-	exitnode    string
+	provider      string
+	regionRepo    *repos.RegionRepo
+	projectRepo   *repos.ProjectRepo
+	queryRepo     *repos.QueryRepo
+	neonClient    *neonapi.Client
+	register      *bgjobs.Register
+	exitnode      string
+	projectLocker *bgjobs.ProjectLocker
 }
 
 type DeleteProjectArgs struct {
@@ -62,14 +63,15 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 	}
 
 	return &DeleteProject{
-		args:        args,
-		provider:    a.Config.Provider,
-		regionRepo:  a.Repo.Region,
-		projectRepo: a.Repo.Project,
-		queryRepo:   a.Repo.Query,
-		neonClient:  a.NeonClient,
-		register:    a.Register,
-		exitnode:    a.Config.Exitnode,
+		args:          args,
+		provider:      a.Config.Provider,
+		regionRepo:    a.Repo.Region,
+		projectRepo:   a.Repo.Project,
+		queryRepo:     a.Repo.Query,
+		neonClient:    a.NeonClient,
+		register:      a.Register,
+		exitnode:      a.Config.Exitnode,
+		projectLocker: a.ProjectLocker,
 	}, nil
 }
 
@@ -129,6 +131,16 @@ func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Regi
 // Delete a project.
 func (c *DeleteProject) deleteProject(ctx context.Context, projectDB *models.Project) error {
 	// TODO: kill background jobs for this project and wait for them to finish
+	projectLock := c.projectLocker.Get(projectDB.ID)
+	unlock := projectLock.TryExclusiveLock()
+	if unlock == nil {
+		return errors.New("failed to lock project, active background queries")
+	}
+	defer unlock()
+
+	if projectLock.Deleted.Load() {
+		return errors.New("project is already deleted")
+	}
 
 	if c.args.SkipFailedQueries.Enabled {
 		err := c.hasRecentFailedQueries(projectDB)
@@ -174,6 +186,9 @@ func (c *DeleteProject) deleteProject(ctx context.Context, projectDB *models.Pro
 	}
 
 	log.Info(ctx, "project deleted")
+	projectLock.Deleted.Store(true)
+
+	c.projectLocker.Delete(projectDB.ID)
 	return nil
 }
 
