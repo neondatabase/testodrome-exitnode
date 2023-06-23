@@ -90,7 +90,7 @@ func (p *Prepared[T]) Do(ctx context.Context) (*T, *models.QueryResult, error) {
 		StartedAt:  &time.Time{},
 		FinishedAt: &time.Time{},
 		IsFailed:   false,
-		Duration:   0,
+		Duration:   nil,
 	}
 
 	var responseObj T
@@ -143,8 +143,9 @@ func (p *Prepared[T]) do(ctx context.Context, responseObj any, result *models.Qu
 	}
 
 	finishedAt := time.Now()
+	duration := finishedAt.Sub(startedAt)
 	result.FinishedAt = &finishedAt
-	result.Duration = finishedAt.Sub(startedAt)
+	result.Duration = &duration
 	result.Response = string(body)
 
 	log.Info(

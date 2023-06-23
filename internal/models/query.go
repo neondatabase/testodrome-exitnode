@@ -64,5 +64,13 @@ type QueryResult struct {
 	// IsFailed is true if the query is failed.
 	IsFailed bool
 	// Duration is the duration of the query.
-	Duration time.Duration
+	Duration *time.Duration
+}
+
+func QueryDuration(ns *int64) *time.Duration {
+	if ns == nil {
+		return nil
+	}
+	d := time.Duration(*ns)
+	return &d
 }

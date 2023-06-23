@@ -85,11 +85,6 @@ func (r *QueryProject) executeForProject(ctx context.Context, project models.Pro
 	ctx = log.With(ctx, zap.Uint("projectID", project.ID))
 	// TODO: use a library to select random query and random driver
 
-	driver, err1 := drivers.NewServerless(r.exitnode, &project)
-	if err1 != nil {
-		return err1
-	}
-
 	const select1 = `SELECT 1`
 	const createTable = `CREATE TABLE IF NOT EXISTS activity_v1 (
 		id SERIAL PRIMARY KEY,
@@ -99,26 +94,51 @@ func (r *QueryProject) executeForProject(ctx context.Context, project models.Pro
 	  )`
 	const doActivity = `INSERT INTO activity_v1(nonce,val) SELECT $1 AS nonce, avg(id) AS val FROM activity_v1 RETURNING *`
 
-	// first query, can trigger a cold start
-	query, err2 := driver.Query(ctx, select1)
-	if err := r.saveQuery(query, err2); err != nil {
-		return err
+	queries := []drivers.SingleQuery{
+		// first query, can trigger a cold start
+		{Query: select1},
+		// init table
+		{Query: createTable},
+		// do some activity
+		{Query: doActivity, Params: []any{rand.Int63()}},
 	}
 
-	// init table
-	query, err2 = driver.Query(ctx, createTable)
-	if err := r.saveQuery(query, err2); err != nil {
-		return err
+	driver := rand.Intn(2)
+	if driver == 0 {
+		return r.goServerlessDriver(ctx, project, queries)
+	} else {
+		return r.vercelSLDriver(ctx, project, queries)
+	}
+}
+
+func (r *QueryProject) goServerlessDriver(ctx context.Context, project models.Project, queries []drivers.SingleQuery) error {
+	driver, err1 := drivers.NewServerless(r.exitnode, &project)
+	if err1 != nil {
+		return err1
 	}
 
-	// do some activity
-	nonce := rand.Int63()
-	query, err2 = driver.Query(ctx, doActivity, nonce)
-	if err := r.saveQuery(query, err2); err != nil {
-		return err
+	for _, q := range queries {
+		query, err2 := driver.Query(ctx, q.Query, q.Params...)
+		if err := r.saveQuery(query, err2); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func (r *QueryProject) vercelSLDriver(ctx context.Context, project models.Project, queries []drivers.SingleQuery) error {
+	driver := drivers.NewVercelSL(&project)
+	res, err2 := driver.Queries(ctx, queries...)
+
+	for _, q := range res {
+		q := q
+		if err := r.saveQuery(&q, err2); err != nil {
+			return err
+		}
+	}
+
+	return err2
 }
 
 func (r *QueryProject) saveQuery(query *models.Query, queryErr error) (retErr error) {

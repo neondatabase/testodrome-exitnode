@@ -101,8 +101,9 @@ func (s *Serverless) Query(ctx context.Context, query string, params ...any) (re
 	}
 
 	finishedAt := time.Now()
+	duration := finishedAt.Sub(startedAt)
 	retQuery.FinishedAt = &finishedAt
-	retQuery.Duration = finishedAt.Sub(startedAt)
+	retQuery.Duration = &duration
 	retQuery.IsFinished = true
 	retQuery.Response = string(body)
 
