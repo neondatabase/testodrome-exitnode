@@ -13,7 +13,7 @@ INSERT INTO regions(id, created_at, updated_at, "provider", database_region) VAL
 INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 1, '{"act": "create_project", "args": {"Interval": "10m"}}'::jsonb);
 
 -- delete projects if there are > 5 (in each region)
-INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 2, '{"act": "delete_project", "args": {"N": 5}}'::jsonb);
+INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 2, '{"act": "delete_project", "args": {"ProjectsN": 5}}'::jsonb);
 
 -- query a random project
 INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 3, '{"act": "query_project", "args": {}}'::jsonb);

@@ -34,7 +34,7 @@ type DeleteProject struct {
 
 type DeleteProjectArgs struct {
 	// Target number of projects. Project will be deleted if there are more than this number of projects.
-	N                 int
+	ProjectsN         int
 	SkipFailedQueries *SkipFailedQueries
 }
 
@@ -98,7 +98,7 @@ func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Regi
 		return
 	}
 
-	if len(projects) <= c.args.N {
+	if len(projects) <= c.args.ProjectsN {
 		return
 	}
 
@@ -108,7 +108,7 @@ func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Regi
 	})
 
 	// take any N projects
-	projects = projects[:c.args.N]
+	projects = projects[:c.args.ProjectsN]
 
 	// sort by creation date
 	sort.Slice(projects, func(i, j int) bool {

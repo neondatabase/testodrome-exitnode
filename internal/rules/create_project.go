@@ -22,6 +22,7 @@ import (
 // Rule to create a project in every region at least once per `interval` minutes.
 type CreateProject struct {
 	interval time.Duration
+	args     CreateProjectArgs
 	// Projects will be created only in regions adhering to these filters.
 	regionFilters []repos.Filter
 	regionRepo    *repos.RegionRepo
@@ -34,7 +35,19 @@ type CreateProject struct {
 }
 
 type CreateProjectArgs struct {
-	Interval rdesc.Duration
+	Interval    rdesc.Duration
+	PgVersion   rdesc.Wrand[int]
+	Provisioner rdesc.Wrand[string]
+}
+
+var defaultPgVersion = rdesc.Wrand[int]{
+	{Weight: 1, Item: 15},
+	{Weight: 1, Item: 14},
+}
+
+var defaultProvisioner = rdesc.Wrand[string]{
+	{Weight: 1, Item: "k8s-pod"},
+	{Weight: 1, Item: "k8s-neonvm"},
 }
 
 func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
@@ -44,8 +57,16 @@ func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 		return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 	}
 
+	if args.PgVersion == nil {
+		args.PgVersion = defaultPgVersion
+	}
+	if args.Provisioner == nil {
+		args.Provisioner = defaultProvisioner
+	}
+
 	return &CreateProject{
 		interval:      args.Interval.Duration,
+		args:          args,
 		regionFilters: a.RegionFilters,
 		regionRepo:    a.Repo.Region,
 		projectRepo:   a.Repo.Project,
@@ -99,8 +120,10 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 	}
 
 	createRequest := &neonapi.CreateProject{
-		Name:     fmt.Sprintf("test@%s-%d", c.config.Exitnode, projectSeqID),
-		RegionID: region.DatabaseRegion,
+		Name:        fmt.Sprintf("test@%s-%d", c.config.Exitnode, projectSeqID),
+		RegionID:    region.DatabaseRegion,
+		PgVersion:   c.args.PgVersion.Pick(),
+		Provisioner: c.args.Provisioner.Pick(),
 	}
 
 	prep, err := c.neonClient.CreateProject(createRequest)
@@ -148,6 +171,8 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 		ProjectID:         project.Project.ID,
 		ConnectionString:  connstr,
 		CreatedByExitnode: c.config.Exitnode,
+		PgVersion:         project.Project.PgVersion,
+		Provisioner:       project.Project.Provisioner,
 	}
 
 	err = c.projectRepo.Create(&dbProject)

@@ -21,6 +21,12 @@ type Project struct {
 	// Taken from `EXITNODE` environment variable.
 	CreatedByExitnode string
 
+	// Specified at the creation time.
+	PgVersion int
+
+	// Specified at the creation time.
+	Provisioner string
+
 	// TODO:
 	// Comment about a policy of creation.
 	// CreationComment string

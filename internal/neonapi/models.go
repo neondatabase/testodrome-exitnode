@@ -133,8 +133,8 @@ type CreateProject struct {
 	Name     string `json:"name"`
 	RegionID string `json:"region_id"`
 
-	// TODO: add PgVersion to the matrix
-	// PgVersion int    `json:"pg_version"`
+	PgVersion   int    `json:"pg_version"`
+	Provisioner string `json:"provisioner"`
 }
 
 type DeleteProjectResponse struct {
