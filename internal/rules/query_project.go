@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"regexp"
 
 	"go.uber.org/zap"
 
@@ -13,11 +14,13 @@ import (
 	"github.com/petuhovskiy/neon-lights/internal/drivers"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
+	"github.com/petuhovskiy/neon-lights/internal/rdesc"
 	"github.com/petuhovskiy/neon-lights/internal/repos"
 )
 
 // Rule to send random queries to random projects.
 type QueryProject struct {
+	args          QueryProjectArgs
 	regionFilters []repos.Filter
 	regionRepo    *repos.RegionRepo
 	projectRepo   *repos.ProjectRepo
@@ -28,6 +31,12 @@ type QueryProject struct {
 }
 
 type QueryProjectArgs struct {
+	UsePooler rdesc.Wrand[bool]
+}
+
+var defaultUsePooler = rdesc.Wrand[bool]{
+	{Weight: 1, Item: true},
+	{Weight: 1, Item: false},
 }
 
 func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
@@ -37,7 +46,12 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 		return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 	}
 
+	if args.UsePooler == nil {
+		args.UsePooler = defaultUsePooler
+	}
+
 	return &QueryProject{
+		args:          args,
 		regionFilters: a.RegionFilters,
 		regionRepo:    a.Repo.Region,
 		projectRepo:   a.Repo.Project,
@@ -82,7 +96,19 @@ func (r *QueryProject) executeForRegion(ctx context.Context, region models.Regio
 	}
 }
 
-func (r *QueryProject) randomDriver(ctx context.Context, project models.Project) (drivers.Driver, error) {
+func appendPoolerSuffix(connstr string) (string, error) {
+	// connstr has `@<endpoint_id>.` substring in it
+	// we need to replace it with `@<endpoint_id>-pooler.`
+	// using regex for that
+	re := regexp.MustCompile(`@([a-z0-9\-]+)\.`)
+	newConnstr := re.ReplaceAllString(connstr, "@$1-pooler.")
+	if newConnstr == connstr {
+		return "", fmt.Errorf("failed to replace connstr with pooler")
+	}
+	return newConnstr, nil
+}
+
+func (r *QueryProject) randomDriver(ctx context.Context, project models.Project, usePooler bool) (drivers.Driver, error) {
 	// save queries to the database with project and exitnode info
 	saver := repos.NewQuerySaver(r.queryRepo, repos.QuerySaverArgs{
 		ProjectID: &project.ID,
@@ -90,17 +116,26 @@ func (r *QueryProject) randomDriver(ctx context.Context, project models.Project)
 		RegionID:  &project.RegionID,
 	})
 
+	connstr := project.ConnectionString
+	if usePooler {
+		var err error
+		connstr, err = appendPoolerSuffix(connstr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to append pooler suffix: %w", err)
+		}
+	}
+
 	num := rand.Intn(3)
 	switch num {
 	case 0:
 		log.Info(ctx, "using serverless driver")
-		return drivers.NewServerless(project.ConnectionString, saver)
+		return drivers.NewServerless(connstr, saver)
 	case 1:
 		log.Info(ctx, "using vercel-sl driver")
-		return drivers.NewVercelSL(project.ConnectionString, saver), nil
+		return drivers.NewVercelSL(connstr, saver), nil
 	case 2:
 		log.Info(ctx, "using pgx driver")
-		return drivers.PgxConnect(ctx, project.ConnectionString, saver)
+		return drivers.PgxConnect(ctx, connstr, saver)
 	}
 
 	panic("unreachable")
@@ -117,9 +152,11 @@ func (r *QueryProject) executeForProject(ctx context.Context, project models.Pro
 	}
 	defer unlock()
 
+	usePooler := r.args.UsePooler.Pick()
+
 	// TODO: use a library to select random query and random driver
 
-	driver, err1 := r.randomDriver(ctx, project)
+	driver, err1 := r.randomDriver(ctx, project, usePooler)
 	if err1 != nil {
 		return fmt.Errorf("failed to create driver: %w", err1)
 	}
