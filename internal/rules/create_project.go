@@ -50,6 +50,8 @@ var defaultProvisioner = rdesc.Wrand[string]{
 	{Weight: 1, Item: "k8s-neonvm"},
 }
 
+const stdProvisioner = "k8s-pod"
+
 func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 	var args CreateProjectArgs
 	err := json.Unmarshal(j, &args)
@@ -119,11 +121,16 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 		return err
 	}
 
+	provisioner := c.args.Provisioner.Pick()
+	if !region.SupportsNeonVM {
+		provisioner = stdProvisioner
+	}
+
 	createRequest := &neonapi.CreateProject{
 		Name:        fmt.Sprintf("test@%s-%d", c.config.Exitnode, projectSeqID),
 		RegionID:    region.DatabaseRegion,
 		PgVersion:   c.args.PgVersion.Pick(),
-		Provisioner: c.args.Provisioner.Pick(),
+		Provisioner: provisioner,
 	}
 
 	prep, err := c.neonClient.CreateProject(createRequest)

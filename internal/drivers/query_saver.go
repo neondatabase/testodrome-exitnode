@@ -32,6 +32,7 @@ func saveQuery(saver QuerySaver, query *models.Query, queryErr error) (retErr er
 	return retErr
 }
 
+//nolint:unparam
 func startQuery(kind models.QueryDestination, addr string, driver string, method string, request string) *models.Query {
 	now := time.Now()
 	return &models.Query{

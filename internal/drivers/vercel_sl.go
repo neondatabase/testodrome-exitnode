@@ -111,7 +111,19 @@ func (s *VercelSL) queries(ctx context.Context, queries ...SingleQuery) ([]model
 
 	var slResp slResponse
 	if err := json.Unmarshal(body, &slResp); err != nil {
-		return nil, err
+		log.Error(ctx, "failed to unmarshal response", zap.String("body", string(body)))
+		// save invalid response to the database
+
+		failedQuery := startQuery(
+			models.QueryDB,
+			s.connstr,
+			"vercel-sl",
+			"POST",
+			string(requestBody),
+		)
+		finishQuery(failedQuery, string(body), err)
+
+		return nil, saveQuery(s.saver, failedQuery, err)
 	}
 
 	var retQueries []models.Query

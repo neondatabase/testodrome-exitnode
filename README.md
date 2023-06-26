@@ -24,6 +24,13 @@ go run main.go | tee -a app.log
 # now program should be running without errors, until Ctrl+C is pressed
 ```
 
+## Deploying
+
+1. Get a Neon account. Don't forget to increase a limit for the projects.
+2. Get a Postgres database.
+3. Put env variables.
+4. Run.
+
 <details>
 <summary>Development</summary>
 

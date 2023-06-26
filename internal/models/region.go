@@ -10,4 +10,7 @@ type Region struct {
 
 	// Name of the region, e.g. "aws-us-east-1"
 	DatabaseRegion string
+
+	// Whether the region supports autoscaling (neonvm provisioner)
+	SupportsNeonVM bool
 }
