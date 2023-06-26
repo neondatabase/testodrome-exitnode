@@ -1,6 +1,11 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"bytes"
+	"encoding/json"
+
+	"gorm.io/gorm"
+)
 
 // Project is a single DBMS created in a region.
 type Project struct {
@@ -44,4 +49,25 @@ func (p *Project) SuspendTimeout() int {
 		return defaultTimeout
 	}
 	return p.SuspendTimeoutSeconds
+}
+
+func CommonProjectFeatures(projects []Project) map[string]json.RawMessage {
+	var features map[string]json.RawMessage
+	for _, project := range projects {
+		j, _ := json.Marshal(project)
+		var f map[string]json.RawMessage
+		_ = json.Unmarshal(j, &f)
+
+		if features == nil {
+			features = f
+			continue
+		}
+
+		for k, v := range features {
+			if !bytes.Equal(v, f[k]) {
+				delete(features, k)
+			}
+		}
+	}
+	return features
 }

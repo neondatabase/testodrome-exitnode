@@ -65,7 +65,10 @@ func (r *QueryProject) Execute(ctx context.Context) error {
 func (r *QueryProject) executeForRegion(ctx context.Context, region models.Region) {
 	ctx = log.With(ctx, zap.Uint("regionID", region.ID))
 
-	projects, err := r.projectRepo.FindRandomProjects(region.ID, 1)
+	filters := []repos.Filter{
+		repos.FilterByRegionID(region.ID),
+	}
+	projects, err := r.projectRepo.FindRandomProjects(filters, 1)
 	if err != nil {
 		log.Error(ctx, "failed to find random project", zap.Error(err))
 		return

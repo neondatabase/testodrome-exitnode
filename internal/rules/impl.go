@@ -25,6 +25,8 @@ func loadImpl(base *app.App, executor *Executor, desc rdesc.Rule) (RuleImpl, err
 		return NewDoGlobalRules(base, executor, desc.Args)
 	case rdesc.ActQueryProject:
 		return NewQueryProject(base, desc.Args)
+	case rdesc.ActTest:
+		return NewTestRule(base, desc.Args)
 	default:
 		return nil, fmt.Errorf("unknown rule act %s: %w", desc.Act, ErrUnknownRule)
 	}

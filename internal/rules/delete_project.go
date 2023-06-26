@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"sort"
 
 	"go.uber.org/zap"
@@ -19,11 +18,9 @@ import (
 )
 
 // Rule to delete random projects when there are too many projects with the similar configuration (matrix).
-// TODO: make it work with custom matrix, not only per-region.
 type DeleteProject struct {
 	args          DeleteProjectArgs
 	regionFilters []repos.Filter
-	regionRepo    *repos.RegionRepo
 	projectRepo   *repos.ProjectRepo
 	queryRepo     *repos.QueryRepo
 	neonClient    *neonapi.Client
@@ -36,6 +33,8 @@ type DeleteProjectArgs struct {
 	// Target number of projects. Project will be deleted if there are more than this number of projects.
 	ProjectsN         int
 	SkipFailedQueries *SkipFailedQueries
+	// Matrix is a list of project fields to compare. Used to determine similar projects that can be deleted.
+	Matrix []string
 }
 
 type SkipFailedQueries struct {
@@ -50,6 +49,13 @@ var defaultSkipFailedQueries = SkipFailedQueries{
 	QueriesN: 3,
 }
 
+var defaultMatrix = []string{
+	"projects.region_id",
+	"projects.pg_version",
+	"projects.provisioner",
+	"projects.suspend_timeout_seconds",
+}
+
 func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 	var args DeleteProjectArgs
 	err := json.Unmarshal(j, &args)
@@ -57,14 +63,21 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 		return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 	}
 
+	if args.ProjectsN < 1 {
+		return nil, fmt.Errorf("ProjectsN must be positive")
+	}
+
 	if args.SkipFailedQueries == nil {
 		args.SkipFailedQueries = &defaultSkipFailedQueries
+	}
+
+	if args.Matrix == nil {
+		args.Matrix = defaultMatrix
 	}
 
 	return &DeleteProject{
 		args:          args,
 		regionFilters: a.RegionFilters,
-		regionRepo:    a.Repo.Region,
 		projectRepo:   a.Repo.Project,
 		queryRepo:     a.Repo.Query,
 		neonClient:    a.NeonClient,
@@ -75,39 +88,55 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 }
 
 func (c *DeleteProject) Execute(ctx context.Context) error {
-	regions, err := c.regionRepo.Find(c.regionFilters)
+	// selecting random project to get a random matrix
+	project, err := c.randomProject()
+	if err != nil {
+		return err
+	}
+	if project == nil {
+		return nil
+	}
+
+	return c.executeForMatrix(ctx, project, c.args.Matrix)
+}
+
+func (c *DeleteProject) randomProject() (*models.Project, error) {
+	projects, err := c.projectRepo.FindRandomProjects(c.regionFilters, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(projects) == 0 {
+		return nil, nil
+	}
+	return &projects[0], nil
+}
+
+// Execute rule for a specified matrix. Will delete a project only if the are too many.
+func (c *DeleteProject) executeForMatrix(ctx context.Context, matrixProject *models.Project, matrix []string) error {
+	ctx = log.With(ctx, zap.Any("matrix", matrix))
+	// TODO: add exact matrix params with gorm?
+
+	filters, err := repos.MatrixFilters(matrixProject, matrix)
+	if err != nil {
+		return err
+	}
+	filters = append(filters, c.regionFilters...)
+
+	projects, err := c.projectRepo.FindRandomProjects(filters, c.args.ProjectsN+1)
 	if err != nil {
 		return err
 	}
 
-	for _, region := range regions {
-		region := region
-		c.register.Go(func() { c.executeForRegion(ctx, region) })
-	}
-	return nil
-}
-
-// Execute rule for a single region. Will delete a project only if the are too many.
-func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Region) {
-	ctx = log.With(ctx, zap.Uint("regionID", region.ID))
-
-	// TODO: it is not efficient to load all projects here, but it is ok for now.
-	projects, err := c.projectRepo.FindAllByRegion(region.ID)
-	if err != nil {
-		log.Error(ctx, "failed to load projects", zap.Error(err))
-		return
-	}
+	commonFeatures := models.CommonProjectFeatures(projects)
+	ctx = log.With(ctx, zap.Any("common", commonFeatures))
+	log.Info(ctx, "selected projects", zap.Int("count", len(projects)))
 
 	if len(projects) <= c.args.ProjectsN {
-		return
+		return nil
 	}
 
-	// shuffle projects to delete random ones
-	rand.Shuffle(len(projects), func(i, j int) {
-		projects[i], projects[j] = projects[j], projects[i]
-	})
-
-	// take any N projects
+	// take only N projects
 	projects = projects[:c.args.ProjectsN]
 
 	// sort by creation date
@@ -120,11 +149,7 @@ func (c *DeleteProject) executeForRegion(ctx context.Context, region models.Regi
 	ctx = log.With(ctx, zap.Uint("projectID", project.ID))
 	log.Info(ctx, "selected project for deletion")
 
-	err = c.deleteProject(ctx, &project)
-	if err != nil {
-		log.Error(ctx, "failed to delete project", zap.Error(err))
-		return
-	}
+	return c.deleteProject(ctx, &project)
 }
 
 // Delete a project.

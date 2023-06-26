@@ -56,12 +56,18 @@ func (r *ProjectRepo) Delete(project *models.Project) error {
 	return r.db.Delete(project).Error
 }
 
-func (r *ProjectRepo) FindRandomProjects(regionID uint, n int) ([]models.Project, error) {
+func (r *ProjectRepo) FindRandomProjects(filters []Filter, n int) ([]models.Project, error) {
 	// TODO: optimize this, https://stackoverflow.com/questions/8674718/best-way-to-select-random-rows-postgresql
 
 	var projects []models.Project
-	err := r.db.
-		Where("region_id = ?", regionID).
+
+	db := r.db
+	db = db.Joins("LEFT JOIN regions ON regions.id = projects.region_id")
+	for _, filter := range filters {
+		db = filter.Apply(db)
+	}
+
+	err := db.
 		Order("RANDOM()").
 		Limit(n).
 		Find(&projects).
