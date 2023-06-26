@@ -41,6 +41,24 @@ func (c *Client) DeleteProject(projectID string) (*Prepared[DeleteProjectRespons
 	return prepare[DeleteProjectResponse](c, "DeleteProject", "DELETE", fmt.Sprintf("/projects/%s", projectID), nil)
 }
 
+func (c *Client) UpdateEndpoint(projectID string, endpointID string, update *UpdateEndpoint) (*Prepared[UpdateEndpointResponse], error) {
+	// https://api-docs.neon.tech/reference/updateprojectendpoint
+	return prepare[UpdateEndpointResponse](
+		c,
+		"UpdateEndpoint",
+		"PATCH",
+		fmt.Sprintf("/projects/%s/endpoints/%s", projectID, endpointID),
+		&UpdateEndpointRequest{
+			Endpoint: update,
+		},
+	)
+}
+
+func (c *Client) GetOperations(projectID string) (*Prepared[GetOperationsResponse], error) {
+	// https://api-docs.neon.tech/reference/listprojectoperations
+	return prepare[GetOperationsResponse](c, "GetOperations", "GET", fmt.Sprintf("/projects/%s/operations", projectID), nil)
+}
+
 type Prepared[T any] struct {
 	cli       *Client
 	method    string
@@ -80,6 +98,10 @@ func (p *Prepared[T]) Query(projectID *uint, regionID uint, exitnode string) *mo
 		Request:     string(p.body),
 		QueryResult: models.QueryResult{},
 	}
+}
+
+func (p *Prepared[T]) QueryNoArgs() *models.Query {
+	return p.Query(nil, 0, "")
 }
 
 func (p *Prepared[T]) Do(ctx context.Context) (*T, *models.QueryResult, error) {

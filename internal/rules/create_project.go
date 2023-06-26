@@ -3,7 +3,6 @@ package rules
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -35,9 +34,10 @@ type CreateProject struct {
 }
 
 type CreateProjectArgs struct {
-	Interval    rdesc.Duration
-	PgVersion   rdesc.Wrand[int]
-	Provisioner rdesc.Wrand[string]
+	Interval       rdesc.Duration
+	PgVersion      rdesc.Wrand[int]
+	Provisioner    rdesc.Wrand[string]
+	SuspendTimeout rdesc.Wrand[int]
 }
 
 var defaultPgVersion = rdesc.Wrand[int]{
@@ -52,6 +52,13 @@ var defaultProvisioner = rdesc.Wrand[string]{
 
 const stdProvisioner = "k8s-pod"
 
+var defaultSuspendTimeout = rdesc.Wrand[int]{
+	// 0 means default timeout.
+	{Weight: 20, Item: 0},
+	// 1 second timeout.
+	{Weight: 1, Item: 1},
+}
+
 func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 	var args CreateProjectArgs
 	err := json.Unmarshal(j, &args)
@@ -64,6 +71,9 @@ func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 	}
 	if args.Provisioner == nil {
 		args.Provisioner = defaultProvisioner
+	}
+	if args.SuspendTimeout == nil {
+		args.SuspendTimeout = defaultSuspendTimeout
 	}
 
 	return &CreateProject{
@@ -126,6 +136,8 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 		provisioner = stdProvisioner
 	}
 
+	suspendTimeout := c.args.SuspendTimeout.Pick()
+
 	createRequest := &neonapi.CreateProject{
 		Name:        fmt.Sprintf("test@%s-%d", c.config.Exitnode, projectSeqID),
 		RegionID:    region.DatabaseRegion,
@@ -138,32 +150,23 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 		return err
 	}
 
-	dbQuery := prep.Query(nil, region.ID, c.config.Exitnode)
-	err = c.queryRepo.Save(dbQuery)
-	if err != nil {
-		return fmt.Errorf("failed to persist query: %w", err)
-	}
+	saver := repos.NewQuerySaver(c.queryRepo, repos.QuerySaverArgs{
+		ProjectID: nil,
+		RegionID:  &region.ID,
+		Exitnode:  &c.config.Exitnode,
+	})
 
-	project, result, err := prep.Do(ctx)
-	dbErr := c.queryRepo.FinishSaveResult(dbQuery, result)
-
-	// 1. save response to the database
-	if dbErr != nil {
-		log.Error(ctx, "failed to persist query result", zap.Error(dbErr))
-		if err == nil {
-			err = dbErr
-		} else {
-			err = errors.Join(err, dbErr)
-		}
-	}
-
-	// 2. handle error
+	project, err := queryAPI(ctx, prep, saver)
 	if err != nil {
 		return err
 	}
 
-	// 3. process the response
 	ctx = log.With(ctx, zap.String("projectID", project.Project.ID))
+
+	if err2 := c.postCreate(ctx, saver, project, suspendTimeout); err2 != nil {
+		log.Error(ctx, "failed post create", zap.Error(err2))
+		return err2
+	}
 
 	var connstr string
 	if len(project.ConnectionUris) == 1 {
@@ -173,18 +176,87 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 	}
 
 	dbProject := models.Project{
-		RegionID:          region.ID,
-		Name:              project.Project.Name,
-		ProjectID:         project.Project.ID,
-		ConnectionString:  connstr,
-		CreatedByExitnode: c.config.Exitnode,
-		PgVersion:         project.Project.PgVersion,
-		Provisioner:       project.Project.Provisioner,
+		RegionID:              region.ID,
+		Name:                  project.Project.Name,
+		ProjectID:             project.Project.ID,
+		ConnectionString:      connstr,
+		CreatedByExitnode:     c.config.Exitnode,
+		PgVersion:             project.Project.PgVersion,
+		Provisioner:           project.Project.Provisioner,
+		SuspendTimeoutSeconds: suspendTimeout,
 	}
 
 	err = c.projectRepo.Create(&dbProject)
 	if err != nil {
 		return fmt.Errorf("failed to create project in the database: %w", err)
+	}
+
+	return nil
+}
+
+func (c *CreateProject) postCreate(
+	ctx context.Context,
+	saver *repos.QuerySaver,
+	project *neonapi.CreateProjectResponse,
+	suspendTimeout int,
+) error {
+	if len(project.Endpoints) != 1 {
+		log.Warn(ctx, "project has invalid number of endpoints", zap.Any("endpoints", project.Endpoints))
+		return nil
+	}
+	endpoint := project.Endpoints[0]
+
+	if suspendTimeout == endpoint.SuspendTimeoutSeconds {
+		return nil
+	}
+
+	// wait until all operations are finished, otherwise we will get an error:
+	// `project already has running operations, scheduling of new ones is prohibited`
+	if err := c.waitAllOperations(ctx, saver, project); err != nil {
+		return err
+	}
+
+	log.Info(ctx, "updating suspend timeout", zap.Int("old", endpoint.SuspendTimeoutSeconds), zap.Int("new", suspendTimeout))
+	prep, err := c.neonClient.UpdateEndpoint(project.Project.ID, endpoint.ID, &neonapi.UpdateEndpoint{
+		SuspendTimeoutSeconds: &suspendTimeout,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = queryAPI(ctx, prep, saver)
+	return err
+}
+
+func (c *CreateProject) waitAllOperations(ctx context.Context, saver *repos.QuerySaver, project *neonapi.CreateProjectResponse) error {
+	// project.Operations has a list of running operations, but it's not convenient to poll them one by one
+	prep, err := c.neonClient.GetOperations(project.Project.ID)
+	if err != nil {
+		return err
+	}
+
+	for {
+		ops, err := queryAPI(ctx, prep, saver)
+		if err != nil {
+			return err
+		}
+
+		allFinished := true
+
+		for _, op := range ops.Operations {
+			if op.Status != "finished" {
+				log.Debug(ctx, "operation not finished", zap.Any("operation", op))
+				allFinished = false
+				break
+			}
+		}
+
+		if allFinished {
+			break
+		}
+
+		const sleepInterval = 2 * time.Second
+		time.Sleep(sleepInterval)
 	}
 
 	return nil

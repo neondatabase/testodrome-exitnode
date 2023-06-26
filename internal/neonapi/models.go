@@ -165,3 +165,25 @@ type DeleteProjectResponse struct {
 		OwnerID                     string    `json:"owner_id"`
 	} `json:"project"`
 }
+
+type UpdateEndpointRequest struct {
+	Endpoint *UpdateEndpoint `json:"endpoint"`
+}
+
+type UpdateEndpoint struct {
+	SuspendTimeoutSeconds *int `json:"suspend_timeout_seconds"`
+}
+
+type UpdateEndpointResponse struct {
+	Endpoint   *Endpoint   `json:"endpoint"`
+	Operations []Operation `json:"operations"`
+}
+
+type GetOperationsResponse struct {
+	Operations []Operation `json:"operations"`
+	Pagination Pagination  `json:"pagination"`
+}
+
+type Pagination struct {
+	Cursor time.Time `json:"cursor"`
+}

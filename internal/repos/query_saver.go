@@ -37,3 +37,7 @@ func (s *QuerySaver) Save(query *models.Query) error {
 	s.args.Apply(query)
 	return s.repo.Save(query)
 }
+
+func (s *QuerySaver) FinishSaveResult(query *models.Query, upd *models.QueryResult) error {
+	return s.repo.FinishSaveResult(query, upd)
+}

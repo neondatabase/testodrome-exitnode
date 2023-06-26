@@ -27,10 +27,21 @@ type Project struct {
 	// Specified at the creation time.
 	Provisioner string
 
+	// Default endpoint will be shut down after this timeout.
+	SuspendTimeoutSeconds int
+
 	// TODO:
 	// Comment about a policy of creation.
 	// CreationComment string
 
 	// Comment about a policy of deletion.
 	// DeletionComment string
+}
+
+func (p *Project) SuspendTimeout() int {
+	if p.SuspendTimeoutSeconds == 0 {
+		const defaultTimeout = 5 * 60
+		return defaultTimeout
+	}
+	return p.SuspendTimeoutSeconds
 }
