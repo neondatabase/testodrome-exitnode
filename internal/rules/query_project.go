@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
+	"sync/atomic"
 
 	"go.uber.org/zap"
 
@@ -18,6 +19,9 @@ import (
 	"github.com/petuhovskiy/neon-lights/internal/repos"
 )
 
+var ErrConcurrencyLimit = fmt.Errorf("concurrency limit reached")
+var ErrProjectLocked = fmt.Errorf("project locked")
+
 // Rule to send random queries to random projects.
 type QueryProject struct {
 	args          QueryProjectArgs
@@ -28,10 +32,14 @@ type QueryProject struct {
 	register      *bgjobs.Register
 	exitnode      string
 	projectLocker *bgjobs.ProjectLocker
+	scenario      queryScenario
+	nowRunning    atomic.Int64
 }
 
 type QueryProjectArgs struct {
-	UsePooler rdesc.Wrand[bool]
+	ConcurrencyLimit int
+	Scenario         string
+	UsePooler        rdesc.Wrand[bool]
 }
 
 var defaultUsePooler = rdesc.Wrand[bool]{
@@ -50,6 +58,11 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 		args.UsePooler = defaultUsePooler
 	}
 
+	scenario, err := getScenario(args.Scenario)
+	if err != nil {
+		return nil, err
+	}
+
 	return &QueryProject{
 		args:          args,
 		regionFilters: a.RegionFilters,
@@ -59,41 +72,83 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 		register:      a.Register,
 		exitnode:      a.Config.Exitnode,
 		projectLocker: a.ProjectLocker,
+		scenario:      scenario,
 	}, nil
 }
 
 func (r *QueryProject) Execute(ctx context.Context) error {
-	regions, err := r.regionRepo.Find(r.regionFilters)
+	projects, err := r.projectRepo.FindRandomProjects(r.regionFilters, 1)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find random project: %w", err)
 	}
 
-	for _, region := range regions {
-		region := region
-		r.register.Go(func() { r.executeForRegion(ctx, region) })
+	for _, project := range projects {
+		r.startExecuteProject(ctx, project)
 	}
+
 	return nil
 }
 
-// Execute rule for a single region. Will delete a project only if the are too many.
-func (r *QueryProject) executeForRegion(ctx context.Context, region models.Region) {
-	ctx = log.With(ctx, zap.Uint("regionID", region.ID))
+func (r *QueryProject) startExecuteProject(ctx context.Context, project models.Project) {
+	ctx = log.With(ctx, zap.Uint("projectID", project.ID))
+	ctx = log.With(ctx, zap.String("scenario", r.args.Scenario))
 
-	filters := []repos.Filter{
-		repos.FilterByRegionID(region.ID),
-	}
-	projects, err := r.projectRepo.FindRandomProjects(filters, 1)
-	if err != nil {
-		log.Error(ctx, "failed to find random project", zap.Error(err))
-		return
-	}
-
-	for _, p := range projects {
-		err := r.executeForProject(ctx, p)
-		if err != nil {
-			log.Error(ctx, "failed to execute queries for project", zap.Error(err), zap.Uint("projectID", p.ID))
+	r.register.Go(func() {
+		err := r.executeForProject(ctx, project)
+		if err == ErrConcurrencyLimit || err == ErrProjectLocked {
+			err = nil
 		}
+		if err != nil {
+			log.Error(ctx, "failed to execute project", zap.Error(err))
+		}
+	})
+}
+
+// Execute a random query for a single project.
+func (r *QueryProject) executeForProject(ctx context.Context, project models.Project) error {
+	projectLock := r.projectLocker.Get(project.ID)
+
+	usePooler := r.args.UsePooler.Pick()
+
+	scenario := r.scenario
+	needExclusiveLock := scenario.exclusive()
+
+	var unlock func()
+	if needExclusiveLock {
+		unlock = projectLock.TryExclusiveLock()
+	} else {
+		unlock = projectLock.TrySharedLock()
 	}
+
+	if unlock == nil {
+		return ErrProjectLocked
+	}
+	defer unlock()
+
+	// project lock is taken now
+
+	// checking concurrency level
+	atmc := r.nowRunning.Add(1)
+	defer r.nowRunning.Add(-1)
+
+	if r.args.ConcurrencyLimit > 0 && atmc > int64(r.args.ConcurrencyLimit) {
+		return ErrConcurrencyLimit
+	}
+
+	// running the scenario
+	driver, err1 := r.randomDriver(ctx, project, usePooler)
+	if err1 != nil {
+		return fmt.Errorf("failed to create driver: %w", err1)
+	}
+
+	if cc, ok := driver.(drivers.CloseableDriver); ok {
+		defer cc.Close(ctx)
+	}
+
+	return scenario.execute(ctx, queryParams{
+		driver:  driver,
+		project: &project,
+	})
 }
 
 func appendPoolerSuffix(connstr string) (string, error) {
@@ -139,63 +194,4 @@ func (r *QueryProject) randomDriver(ctx context.Context, project models.Project,
 	}
 
 	panic("unreachable")
-}
-
-// Execute a random query for a single project.
-func (r *QueryProject) executeForProject(ctx context.Context, project models.Project) error {
-	ctx = log.With(ctx, zap.Uint("projectID", project.ID))
-	projectLock := r.projectLocker.Get(project.ID)
-
-	unlock := projectLock.TrySharedLock()
-	if unlock == nil {
-		return fmt.Errorf("project is locked")
-	}
-	defer unlock()
-
-	usePooler := r.args.UsePooler.Pick()
-
-	// TODO: use a library to select random query and random driver
-
-	driver, err1 := r.randomDriver(ctx, project, usePooler)
-	if err1 != nil {
-		return fmt.Errorf("failed to create driver: %w", err1)
-	}
-
-	const select1 = `SELECT 1`
-	const createTable = `CREATE TABLE IF NOT EXISTS activity_v1 (
-		id SERIAL PRIMARY KEY,
-		nonce BIGINT,
-		val FLOAT,
-		created_at TIMESTAMP DEFAULT NOW()
-	  )`
-	const doActivity = `INSERT INTO activity_v1(nonce,val) SELECT $1 AS nonce, avg(id) AS val FROM activity_v1 RETURNING *`
-
-	queries := []drivers.SingleQuery{
-		// first query, can trigger a cold start
-		{Query: select1},
-		// init table
-		{Query: createTable},
-		// do some activity
-		{Query: doActivity, Params: []any{rand.Int63()}},
-	}
-
-	var res []models.Query
-	var err error
-	if md, ok := driver.(drivers.ManyQueriesDriver); ok {
-		res, err = md.Queries(ctx, queries...)
-	} else {
-		for _, q := range queries {
-			query, err2 := driver.Query(ctx, q)
-			if query != nil {
-				res = append(res, *query)
-			}
-			if err2 != nil {
-				err = err2
-				break
-			}
-		}
-	}
-
-	_ = res
-	return err
 }

@@ -107,7 +107,7 @@ func (s *VercelSL) queries(ctx context.Context, queries ...SingleQuery) ([]model
 		return nil, err
 	}
 
-	log.Info(ctx, "got response", zap.Any("body", json.RawMessage(body)))
+	log.Debug(ctx, "got response", zap.Any("body", json.RawMessage(body)))
 
 	var slResp slResponse
 	if err := json.Unmarshal(body, &slResp); err != nil {

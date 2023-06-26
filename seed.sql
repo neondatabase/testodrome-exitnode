@@ -13,7 +13,13 @@ INSERT INTO regions(id, created_at, updated_at, "provider", database_region, sup
 INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 1, '{"act": "create_project", "args": {"Interval": "10m"}}'::jsonb);
 
 -- delete projects if there are > 5 (in each region)
-INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 2, '{"act": "delete_project", "args": {"ProjectsN": 5}}'::jsonb);
+INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 2, '{"act": "delete_project", "args": {"ProjectsN": 3, "SkipFailedQueries": {"Enabled": true, "QueriesN": 3}, "Matrix": ["projects.region_id", "projects.pg_version", "projects.provisioner", "projects.suspend_timeout_seconds"]}}'::jsonb);
 
 -- query a random project
-INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 3, '{"act": "query_project", "args": {}}'::jsonb);
+INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 3, '{"act": "query_project", "args": {"Scenario": "activityV1"}}'::jsonb);
+
+-- start a forever connection
+INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 4, '{"act": "query_project", "args": {"Scenario": "alwaysOn", "ConcurrencyLimit": 2}}'::jsonb);
+
+-- start an inactive connection
+INSERT INTO global_rules("enabled", priority, "desc") VALUES (true, 5, '{"act": "query_project", "args": {"Scenario": "awaitShutdown", "ConcurrencyLimit": 2}}'::jsonb);

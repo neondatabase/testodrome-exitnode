@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"encoding/json"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -43,12 +44,12 @@ type Project struct {
 	// DeletionComment string
 }
 
-func (p *Project) SuspendTimeout() int {
+func (p *Project) SuspendTimeout() time.Duration {
 	if p.SuspendTimeoutSeconds == 0 {
 		const defaultTimeout = 5 * 60
-		return defaultTimeout
+		return time.Second * defaultTimeout
 	}
-	return p.SuspendTimeoutSeconds
+	return time.Second * time.Duration(p.SuspendTimeoutSeconds)
 }
 
 func CommonProjectFeatures(projects []Project) map[string]json.RawMessage {
