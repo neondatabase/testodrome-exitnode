@@ -1,6 +1,7 @@
 package drivers
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -33,7 +34,14 @@ func saveQuery(saver QuerySaver, query *models.Query, queryErr error) (retErr er
 }
 
 //nolint:unparam
-func startQuery(kind models.QueryDestination, addr string, driver string, method string, request string) *models.Query {
+func startQuery(
+	ctx context.Context,
+	kind models.QueryDestination,
+	addr string,
+	driver string,
+	method string,
+	request string,
+) *models.Query {
 	now := time.Now()
 	return &models.Query{
 		Kind:    kind,
@@ -44,6 +52,7 @@ func startQuery(kind models.QueryDestination, addr string, driver string, method
 		QueryResult: models.QueryResult{
 			StartedAt: &now,
 		},
+		NotCold: IsNotCold(ctx),
 	}
 }
 

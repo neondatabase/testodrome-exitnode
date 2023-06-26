@@ -71,6 +71,9 @@ func (s *VercelSL) Queries(ctx context.Context, queries ...SingleQuery) ([]model
 	res, err := s.queries(ctx, queries...)
 
 	for i := range res {
+		if i > 0 {
+			res[i].NotCold = true
+		}
 		if err2 := saveQuery(s.saver, &res[i], err); err2 != nil {
 			return res, err2
 		}
@@ -115,6 +118,7 @@ func (s *VercelSL) queries(ctx context.Context, queries ...SingleQuery) ([]model
 		// save invalid response to the database
 
 		failedQuery := startQuery(
+			ctx,
 			models.QueryDB,
 			s.connstr,
 			"vercel-sl",

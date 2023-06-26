@@ -21,6 +21,7 @@ type PgxConnection struct {
 
 func PgxConnect(ctx context.Context, connstr string, saver QuerySaver) (*PgxConnection, error) {
 	connQuery := startQuery(
+		ctx,
 		models.QueryDB,
 		connstr,
 		"go-pgx",
@@ -49,6 +50,7 @@ func (c *PgxConnection) Query(ctx context.Context, req SingleQuery) (*models.Que
 	}
 
 	query := startQuery(
+		ctx,
 		models.QueryDB,
 		c.connstr,
 		"go-pgx-conn",

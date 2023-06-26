@@ -63,6 +63,7 @@ func (s *Serverless) query(ctx context.Context, singleQuery SingleQuery) (retQue
 	}
 
 	retQuery = startQuery(
+		ctx,
 		models.QueryDB,
 		s.connstr.String(),
 		"go-serverless",
