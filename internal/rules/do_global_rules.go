@@ -25,10 +25,12 @@ type DoGlobalRules struct {
 	globalRuleRepo *repos.GlobalRuleRepo
 	updateInterval time.Duration
 
-	mu          sync.Mutex
-	lastUpdate  time.Time
-	dbRules     []models.GlobalRule
-	loadedRules []*Rule
+	mu            sync.Mutex
+	lastUpdate    time.Time
+	dbRules       []models.GlobalRule
+	loadedRules   []*Rule
+	globalContext context.Context
+	cancelContext func()
 }
 
 type DoGlobalRulesArgs struct {
@@ -63,24 +65,24 @@ func compareRules(a []models.GlobalRule, b []models.GlobalRule) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func (r *DoGlobalRules) fetchRules(ctx context.Context) ([]*Rule, error) {
+func (r *DoGlobalRules) fetchRules(ctx context.Context) ([]*Rule, context.Context, error) {
 	ctx = log.Into(ctx, "fetchRules")
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if time.Since(r.lastUpdate) < r.updateInterval {
-		return r.loadedRules, nil
+		return r.loadedRules, r.globalContext, nil
 	}
 
 	dbRules, err := r.globalRuleRepo.AllEnabled()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ts := time.Now()
 
 	if compareRules(r.dbRules, dbRules) {
-		return r.loadedRules, nil
+		return r.loadedRules, r.globalContext, nil
 	}
 
 	log.Info(ctx, "global rules updated, loading", zap.Int("count", len(dbRules)))
@@ -90,23 +92,30 @@ func (r *DoGlobalRules) fetchRules(ctx context.Context) ([]*Rule, error) {
 		rule, err := r.executor.ParseJSON(dbRule.Desc)
 		if err != nil {
 			log.Error(ctx, "failed to load rule", zap.Error(err))
-			return nil, err
+			return nil, nil, err
 		}
 
 		loadedRules = append(loadedRules, rule)
 	}
 
+	if r.cancelContext != nil {
+		r.cancelContext()
+	}
+
 	r.dbRules = dbRules
 	r.loadedRules = loadedRules
 	r.lastUpdate = ts
-	return loadedRules, nil
+	r.globalContext, r.cancelContext = context.WithCancel(ctx)
+	return loadedRules, r.globalContext, nil
 }
 
-func (r *DoGlobalRules) Execute(ctx context.Context) error {
-	rules, err := r.fetchRules(ctx)
+func (r *DoGlobalRules) Execute(fctx context.Context) error {
+	rules, ctx, err := r.fetchRules(fctx)
 	if err != nil {
 		return err
 	}
+
+	// TODO: merge contexts, now only global is used
 
 	for _, rule := range rules {
 		err := r.executor.Execute(ctx, rule)
