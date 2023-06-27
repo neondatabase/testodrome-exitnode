@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"regexp"
 	"sync/atomic"
 
@@ -40,11 +39,18 @@ type QueryProjectArgs struct {
 	ConcurrencyLimit int
 	Scenario         string
 	UsePooler        rdesc.Wrand[bool]
+	Driver           rdesc.Wrand[drivers.Name]
 }
 
 var defaultUsePooler = rdesc.Wrand[bool]{
 	{Weight: 1, Item: true},
 	{Weight: 1, Item: false},
+}
+
+var defaultDrivers = rdesc.Wrand[drivers.Name]{
+	{Weight: 1, Item: drivers.PgxConn},
+	{Weight: 1, Item: drivers.GoServerless},
+	{Weight: 1, Item: drivers.VercelEdge},
 }
 
 func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
@@ -56,6 +62,10 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 
 	if args.UsePooler == nil {
 		args.UsePooler = defaultUsePooler
+	}
+
+	if args.Driver == nil {
+		args.Driver = defaultDrivers
 	}
 
 	scenario, err := getScenario(args.Scenario)
@@ -180,18 +190,20 @@ func (r *QueryProject) randomDriver(ctx context.Context, project models.Project,
 		}
 	}
 
-	num := rand.Intn(3)
-	switch num {
-	case 0:
-		log.Info(ctx, "using serverless driver")
-		return drivers.NewServerless(connstr, saver)
-	case 1:
-		log.Info(ctx, "using vercel-sl driver")
-		return drivers.NewVercelSL(connstr, saver), nil
-	case 2:
+	driverName := r.args.Driver.Pick()
+	connstr += fmt.Sprintf("?application_name=testodrome/%s", string(driverName))
+
+	switch driverName {
+	case drivers.PgxConn:
 		log.Info(ctx, "using pgx driver")
 		return drivers.PgxConnect(ctx, connstr, saver)
+	case drivers.GoServerless:
+		log.Info(ctx, "using serverless driver")
+		return drivers.NewServerless(connstr, saver)
+	case drivers.VercelEdge:
+		log.Info(ctx, "using vercel-sl driver")
+		return drivers.NewVercelSL(connstr, saver), nil
 	}
 
-	panic("unreachable")
+	return nil, fmt.Errorf("unknown driver: %s", driverName)
 }

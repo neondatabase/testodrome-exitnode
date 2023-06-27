@@ -6,7 +6,7 @@ Example of the rules:
 - `{"act": "do_global_rules", "args": {}}` – load and execute all rules from the `global_rules` postgres table.
 - `{"act": "create_project", "args": {"Interval": "10m"}}` – create a database in every region, if there were no projects created for the last 10 minutes
 - `{"act": "delete_project", "args": {"ProjectsN": 3}}` – delete a random database in random region, if there are >3 existing databases
-- `{"act": "query_project", "args": {}}` - send a SQL query to the random project
+- `{"act": "query_project", "args": {"Scenario": "activityV1"}}` - send a SQL query to the random project
 
 The default rule is `{"act": "do_global_rules", "args": {}, "periodic": "random(5,35)"}`, which will fetch and execute all rules from the database every 5-35 seconds.
 
