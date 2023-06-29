@@ -262,6 +262,9 @@ func (c *CreateProject) waitAllOperations(ctx context.Context, saver *repos.Quer
 
 		time.Sleep(sleepInterval)
 		sleepInterval += sleepInterval / 2
+		if sleepInterval > maxInterval {
+			sleepInterval = maxInterval
+		}
 	}
 
 	return nil
