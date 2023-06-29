@@ -10,6 +10,8 @@ import (
 	"github.com/petuhovskiy/neon-lights/internal/models"
 )
 
+const pgxDriverName = "go-pgx-conn"
+
 var _ Driver = (*PgxConnection)(nil)
 
 type PgxConnection struct {
@@ -24,7 +26,7 @@ func PgxConnect(ctx context.Context, connstr string, saver QuerySaver) (*PgxConn
 		ctx,
 		models.QueryDB,
 		connstr,
-		"go-pgx",
+		pgxDriverName,
 		"connect",
 		"",
 	)
@@ -53,7 +55,7 @@ func (c *PgxConnection) Query(ctx context.Context, req SingleQuery) (*models.Que
 		ctx,
 		models.QueryDB,
 		c.connstr,
-		"go-pgx-conn",
+		pgxDriverName,
 		"query",
 		string(jsonReq),
 	)
