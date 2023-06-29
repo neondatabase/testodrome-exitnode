@@ -235,6 +235,11 @@ func (c *CreateProject) waitAllOperations(ctx context.Context, saver *repos.Quer
 		return err
 	}
 
+	const startInterval = 2 * time.Second
+	const maxInterval = 60 * time.Second
+
+	sleepInterval := startInterval
+
 	for {
 		ops, err := queryAPI(ctx, prep, saver)
 		if err != nil {
@@ -255,8 +260,8 @@ func (c *CreateProject) waitAllOperations(ctx context.Context, saver *repos.Quer
 			break
 		}
 
-		const sleepInterval = 2 * time.Second
 		time.Sleep(sleepInterval)
+		sleepInterval += sleepInterval / 2
 	}
 
 	return nil
