@@ -110,8 +110,8 @@ type Endpoint struct {
 	ID                    string    `json:"id"`
 	ProjectID             string    `json:"project_id"`
 	BranchID              string    `json:"branch_id"`
-	AutoscalingLimitMinCu int       `json:"autoscaling_limit_min_cu"`
-	AutoscalingLimitMaxCu int       `json:"autoscaling_limit_max_cu"`
+	AutoscalingLimitMinCu float64   `json:"autoscaling_limit_min_cu"`
+	AutoscalingLimitMaxCu float64   `json:"autoscaling_limit_max_cu"`
 	RegionID              string    `json:"region_id"`
 	Type                  string    `json:"type"`
 	CurrentState          string    `json:"current_state"`
