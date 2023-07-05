@@ -67,7 +67,7 @@ func (s *Serverless) query(ctx context.Context, singleQuery SingleQuery) (retQue
 		models.QueryDB,
 		s.connstr.String(),
 		"go-serverless",
-		"sql-over-http",
+		"sql-over-http(pool)",
 		string(requestBody),
 	)
 
@@ -86,6 +86,7 @@ func (s *Serverless) query(ctx context.Context, singleQuery SingleQuery) (retQue
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Neon-Connection-String", s.connstr.String())
+	req.Header.Set("Neon-Pool-Opt-In", "true")
 
 	startedAt := time.Now()
 	retQuery.StartedAt = &startedAt
