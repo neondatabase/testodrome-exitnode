@@ -14,7 +14,7 @@ type App struct {
 	Exitnode string `env:"EXITNODE" envDefault:"local-laptop"`
 
 	// Provider is a name/domain of the current provider.
-	Provider string `env:"PROVIDER" envDefault:"staging.neon.tech"`
+	Provider string `env:"PROVIDER" envDefault:"stage.neon.tech"`
 
 	// NeonAPIKey is an API key for the neon.
 	NeonAPIKey string `env:"NEON_API_KEY,required"`

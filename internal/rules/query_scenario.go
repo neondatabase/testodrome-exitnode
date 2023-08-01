@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/petuhovskiy/neon-lights/internal/app"
 	"github.com/petuhovskiy/neon-lights/internal/drivers"
 	"github.com/petuhovskiy/neon-lights/internal/log"
 	"github.com/petuhovskiy/neon-lights/internal/models"
@@ -62,7 +63,8 @@ func (a *activityV1) execute(ctx context.Context, params queryParams) error {
 		{Query: av1DoActivity, Params: []any{rand.Int63()}},
 	}
 
-	return executeManyQueries(ctx, params.driver, queries)
+	_, err := executeManyQueries(ctx, params.driver, queries)
+	return err
 }
 
 // alwaysOn will execute queries in a loop.
@@ -80,7 +82,7 @@ func (a *alwaysOn) execute(ctx context.Context, params queryParams) error {
 	var err error
 
 	// wake up
-	err = executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
+	_, err = executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
 		{Query: av1Select1},
 	})
 	if err != nil {
@@ -89,7 +91,7 @@ func (a *alwaysOn) execute(ctx context.Context, params queryParams) error {
 
 	lastQuery := time.Now()
 	// init the database
-	err = executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
+	_, err = executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
 		{Query: av1CreateTable},
 	})
 	if err != nil {
@@ -113,12 +115,25 @@ func (a *alwaysOn) execute(ctx context.Context, params queryParams) error {
 		}
 
 		lastQuery = time.Now()
-		err = executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
+		_, err := executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
 			{Query: av1DoActivity, Params: []any{rand.Int63()}},
 		})
+
 		if err != nil {
 			return err
 		}
+
+		res, err := executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
+			{Query: av1Select1},
+		})
+
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(res)
+		// TODO: use actual region name
+		app.AlwaysOnQueryTime.WithLabelValues(fmt.Sprint(params.project.RegionID), res[0].Driver).Observe(res[0].Duration.Seconds())
 	}
 }
 
@@ -131,7 +146,7 @@ func (a *awaitShutdown) exclusive() bool {
 
 func (a *awaitShutdown) execute(ctx context.Context, params queryParams) error {
 	// wake up + init
-	err := executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
+	_, err := executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
 		{Query: av1Select1},
 		{Query: av1CreateTable},
 	})
@@ -152,7 +167,7 @@ func (a *awaitShutdown) execute(ctx context.Context, params queryParams) error {
 	}
 
 	// wake up the database and do some activity
-	err = executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
+	_, err = executeManyQueries(ctx, params.driver, []drivers.SingleQuery{
 		{Query: av1DoActivity, Params: []any{rand.Int63()}},
 	})
 	if err != nil {
@@ -162,7 +177,7 @@ func (a *awaitShutdown) execute(ctx context.Context, params queryParams) error {
 	return nil
 }
 
-func executeManyQueries(ctx context.Context, driver drivers.Driver, queries []drivers.SingleQuery) error {
+func executeManyQueries(ctx context.Context, driver drivers.Driver, queries []drivers.SingleQuery) ([]models.Query, error) {
 	log.Info(ctx, "executing queries", zap.Int("count", len(queries)))
 
 	var res []models.Query
@@ -187,6 +202,5 @@ func executeManyQueries(ctx context.Context, driver drivers.Driver, queries []dr
 		}
 	}
 
-	_ = res
-	return err
+	return res, err
 }

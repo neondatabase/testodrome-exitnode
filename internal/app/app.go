@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -70,9 +72,17 @@ func NewAppFromEnv() (*App, error) {
 	}, nil
 }
 
+var (
+	AlwaysOnQueryTime = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "neonlight_alwayson_query_seconds",
+		Help: "Time spent on each query",
+	}, []string{"region", "driver"})
+)
+
 func (a *App) StartPrometheus() {
 	go func() {
 		mux := http.NewServeMux()
+		prometheus.Register(AlwaysOnQueryTime)
 		mux.Handle("/metrics", promhttp.Handler())
 		err := http.ListenAndServe(a.Config.PrometheusBind, mux)
 		if err != nil && err != http.ErrServerClosed {

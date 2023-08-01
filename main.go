@@ -42,6 +42,8 @@ func main() {
 	}
 	log.Info(ctx, "starting main rule", zap.Any("rule", mainRule))
 
+	base.StartPrometheus()
+
 	globalExecutor := rules.NewExecutor(base)
 	rule, err := globalExecutor.ParseJSON(mainRule)
 	if err != nil {
