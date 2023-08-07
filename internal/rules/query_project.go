@@ -36,10 +36,11 @@ type QueryProject struct {
 }
 
 type QueryProjectArgs struct {
-	ConcurrencyLimit int
-	Scenario         string
-	UsePooler        rdesc.Wrand[bool]
-	Driver           rdesc.Wrand[drivers.Name]
+	ConcurrencyLimit  int
+	Scenario          string
+	UsePooler         rdesc.Wrand[bool]
+	Driver            rdesc.Wrand[drivers.Name]
+	MaxRandomProjects uint
 }
 
 var defaultUsePooler = rdesc.Wrand[bool]{
@@ -68,6 +69,10 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 		args.Driver = defaultDrivers
 	}
 
+	if args.MaxRandomProjects < 1 {
+		args.MaxRandomProjects = 1
+	}
+
 	scenario, err := getScenario(args.Scenario)
 	if err != nil {
 		return nil, err
@@ -87,7 +92,7 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 }
 
 func (r *QueryProject) Execute(ctx context.Context) error {
-	projects, err := r.projectRepo.FindRandomProjects(r.regionFilters, 1)
+	projects, err := r.projectRepo.FindRandomProjects(r.regionFilters, int(r.args.MaxRandomProjects))
 	if err != nil {
 		return fmt.Errorf("failed to find random project: %w", err)
 	}

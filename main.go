@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// TODO: find a way to load it from env
-	const defaultRule = `{"act": "do_global_rules", "args": {}, "periodic": "random(5,35)"}`
+	const defaultRule = `{"act": "do_global_rules", "args": {}, "periodic": "random(1,3)"}`
 
 	var mainRule json.RawMessage = []byte(defaultRule)
 	if len(os.Args) > 1 {
