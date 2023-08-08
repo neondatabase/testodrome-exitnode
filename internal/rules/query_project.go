@@ -23,16 +23,16 @@ var ErrProjectLocked = fmt.Errorf("project locked")
 
 // Rule to send random queries to random projects.
 type QueryProject struct {
-	args          QueryProjectArgs
-	regionFilters []repos.Filter
-	regionRepo    *repos.RegionRepo
-	projectRepo   *repos.ProjectRepo
-	queryRepo     *repos.QueryRepo
-	register      *bgjobs.Register
-	exitnode      string
-	projectLocker *bgjobs.ProjectLocker
-	scenario      queryScenario
-	nowRunning    atomic.Int64
+	args           QueryProjectArgs
+	projectFilters []repos.Filter
+	regionRepo     *repos.RegionRepo
+	projectRepo    *repos.ProjectRepo
+	queryRepo      *repos.QueryRepo
+	register       *bgjobs.Register
+	exitnode       string
+	projectLocker  *bgjobs.ProjectLocker
+	scenario       queryScenario
+	nowRunning     atomic.Int64
 }
 
 type QueryProjectArgs struct {
@@ -41,6 +41,7 @@ type QueryProjectArgs struct {
 	UsePooler         rdesc.Wrand[bool]
 	Driver            rdesc.Wrand[drivers.Name]
 	MaxRandomProjects uint
+	RawProjectFilter  string
 }
 
 var defaultUsePooler = rdesc.Wrand[bool]{
@@ -78,21 +79,27 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 		return nil, err
 	}
 
+	var projectFilters []repos.Filter
+	projectFilters = append(projectFilters, a.RegionFilters...)
+	if args.RawProjectFilter != "" {
+		projectFilters = append(projectFilters, repos.RawFilter(args.RawProjectFilter))
+	}
+
 	return &QueryProject{
-		args:          args,
-		regionFilters: a.RegionFilters,
-		regionRepo:    a.Repo.Region,
-		projectRepo:   a.Repo.Project,
-		queryRepo:     a.Repo.Query,
-		register:      a.Register,
-		exitnode:      a.Config.Exitnode,
-		projectLocker: a.ProjectLocker,
-		scenario:      scenario,
+		args:           args,
+		projectFilters: projectFilters,
+		regionRepo:     a.Repo.Region,
+		projectRepo:    a.Repo.Project,
+		queryRepo:      a.Repo.Query,
+		register:       a.Register,
+		exitnode:       a.Config.Exitnode,
+		projectLocker:  a.ProjectLocker,
+		scenario:       scenario,
 	}, nil
 }
 
 func (r *QueryProject) Execute(ctx context.Context) error {
-	projects, err := r.projectRepo.FindRandomProjects(r.regionFilters, int(r.args.MaxRandomProjects))
+	projects, err := r.projectRepo.FindRandomProjects(r.projectFilters, int(r.args.MaxRandomProjects))
 	if err != nil {
 		return fmt.Errorf("failed to find random project: %w", err)
 	}
