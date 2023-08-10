@@ -208,6 +208,7 @@ func (r *QueryProject) randomDriver(ctx context.Context, project models.Project,
 	switch driverName {
 	case drivers.PgxConn:
 		log.Info(ctx, "using pgx driver")
+		connstr += "&default_query_exec_mode=simple_protocol"
 		return drivers.PgxConnect(ctx, connstr, saver)
 	case drivers.GoServerless:
 		log.Info(ctx, "using serverless driver")
