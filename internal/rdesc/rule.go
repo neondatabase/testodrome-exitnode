@@ -23,4 +23,6 @@ type Rule struct {
 	Periodic string
 	// Arguments passed to the rule constructor
 	Args json.RawMessage
+	// Timeout for rule execution.
+	Timeout *Duration
 }
