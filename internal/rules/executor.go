@@ -67,7 +67,8 @@ func (e *Executor) Execute(ctx context.Context, r *Rule) error {
 func (e *Executor) executeOnce(ctx context.Context, r *Rule) error {
 	ctx = log.Into(ctx, string(r.desc.Act))
 	if r.desc.Timeout != nil {
-		ctx, _ = context.WithTimeout(ctx, r.desc.Timeout.Duration)
+		// we don't want to cancel context, because Execute can do background work
+		ctx, _ = context.WithTimeout(ctx, r.desc.Timeout.Duration) //nolint:govet
 	}
 	return r.impl.Execute(ctx)
 }

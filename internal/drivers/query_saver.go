@@ -35,7 +35,7 @@ func saveQuery(saver QuerySaver, query *models.Query, queryErr error) (retErr er
 
 //nolint:unparam
 func startQuery(
-	ctx context.Context,
+	_ context.Context,
 	kind models.QueryDestination,
 	addr string,
 	driver string,
@@ -52,7 +52,6 @@ func startQuery(
 		QueryResult: models.QueryResult{
 			StartedAt: &now,
 		},
-		NotCold: IsNotCold(ctx),
 	}
 }
 

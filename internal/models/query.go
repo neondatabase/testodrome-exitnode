@@ -48,10 +48,6 @@ type Query struct {
 
 	// Result is available only for finished queries.
 	QueryResult
-
-	// NotCold is true if the query is not the first in the chain.
-	// That means that it's most likely not a cold start.
-	NotCold bool
 }
 
 // QueryResult is available only for finished queries.

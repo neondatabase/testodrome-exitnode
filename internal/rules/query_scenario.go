@@ -170,12 +170,7 @@ func executeManyQueries(ctx context.Context, driver drivers.Driver, queries []dr
 	if md, ok := driver.(drivers.ManyQueriesDriver); ok {
 		res, err = md.Queries(ctx, queries...)
 	} else {
-		for i, q := range queries {
-			ctx := ctx
-			if i > 0 {
-				ctx = drivers.NotColdContext(ctx)
-			}
-
+		for _, q := range queries {
 			var query *models.Query
 			query, err = driver.Query(ctx, q)
 			if query != nil {

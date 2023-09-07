@@ -71,9 +71,6 @@ func (s *VercelSL) Queries(ctx context.Context, queries ...SingleQuery) ([]model
 	res, err := s.queries(ctx, queries...)
 
 	for i := range res {
-		if i > 0 {
-			res[i].NotCold = true
-		}
 		if err2 := saveQuery(s.saver, &res[i], err); err2 != nil {
 			return res, err2
 		}
