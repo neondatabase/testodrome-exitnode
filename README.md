@@ -24,6 +24,11 @@ go run main.go | tee -a app.log
 # now program should be running without errors, until Ctrl+C is pressed
 ```
 
+One more example:
+```bash
+go run main.go '{"act": "query_project", "timeout": "10m", "args": {"Driver": [{"Weight": 1, "Item": "go-serverless"}], "Scenario": "activityV1", "RawProjectFilter": "projects.suspend_timeout_seconds = 0", "MaxRandomProjects": 1}}' | tee -a app.log
+```
+
 ## Deploying
 
 1. Get a Neon account. Don't forget to increase a limit for the projects.

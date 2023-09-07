@@ -19,14 +19,14 @@ import (
 
 // Rule to delete random projects when there are too many projects with the similar configuration (matrix).
 type DeleteProject struct {
-	args          DeleteProjectArgs
-	regionFilters []repos.Filter
-	projectRepo   *repos.ProjectRepo
-	queryRepo     *repos.QueryRepo
-	neonClient    *neonapi.Client
-	register      *bgjobs.Register
-	exitnode      string
-	projectLocker *bgjobs.ProjectLocker
+	args           DeleteProjectArgs
+	projectFilters []repos.Filter
+	projectRepo    *repos.ProjectRepo
+	queryRepo      *repos.QueryRepo
+	neonClient     *neonapi.Client
+	register       *bgjobs.Register
+	exitnode       string
+	projectLocker  *bgjobs.ProjectLocker
 }
 
 type DeleteProjectArgs struct {
@@ -34,7 +34,8 @@ type DeleteProjectArgs struct {
 	ProjectsN         int
 	SkipFailedQueries *SkipFailedQueries
 	// Matrix is a list of project fields to compare. Used to determine similar projects that can be deleted.
-	Matrix []string
+	Matrix           []string
+	RawProjectFilter string
 }
 
 type SkipFailedQueries struct {
@@ -63,8 +64,8 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 		return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 	}
 
-	if args.ProjectsN < 1 {
-		return nil, fmt.Errorf("ProjectsN must be positive")
+	if args.ProjectsN < 0 {
+		return nil, fmt.Errorf("ProjectsN cant be negative")
 	}
 
 	if args.SkipFailedQueries == nil {
@@ -75,15 +76,21 @@ func NewDeleteProject(a *app.App, j json.RawMessage) (*DeleteProject, error) {
 		args.Matrix = defaultMatrix
 	}
 
+	var projectFilters []repos.Filter
+	projectFilters = append(projectFilters, a.RegionFilters...)
+	if args.RawProjectFilter != "" {
+		projectFilters = append(projectFilters, repos.RawFilter(args.RawProjectFilter))
+	}
+
 	return &DeleteProject{
-		args:          args,
-		regionFilters: a.RegionFilters,
-		projectRepo:   a.Repo.Project,
-		queryRepo:     a.Repo.Query,
-		neonClient:    a.NeonClient,
-		register:      a.Register,
-		exitnode:      a.Config.Exitnode,
-		projectLocker: a.ProjectLocker,
+		args:           args,
+		projectFilters: projectFilters,
+		projectRepo:    a.Repo.Project,
+		queryRepo:      a.Repo.Query,
+		neonClient:     a.NeonClient,
+		register:       a.Register,
+		exitnode:       a.Config.Exitnode,
+		projectLocker:  a.ProjectLocker,
 	}, nil
 }
 
@@ -101,7 +108,7 @@ func (c *DeleteProject) Execute(ctx context.Context) error {
 }
 
 func (c *DeleteProject) randomProject() (*models.Project, error) {
-	projects, err := c.projectRepo.FindRandomProjects(c.regionFilters, 1)
+	projects, err := c.projectRepo.FindRandomProjects(c.projectFilters, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +128,7 @@ func (c *DeleteProject) executeForMatrix(ctx context.Context, matrixProject *mod
 	if err != nil {
 		return err
 	}
-	filters = append(filters, c.regionFilters...)
+	filters = append(filters, c.projectFilters...)
 
 	projects, err := c.projectRepo.FindRandomProjects(filters, c.args.ProjectsN+1)
 	if err != nil {
@@ -137,7 +144,9 @@ func (c *DeleteProject) executeForMatrix(ctx context.Context, matrixProject *mod
 	}
 
 	// take only N projects
-	projects = projects[:c.args.ProjectsN]
+	if c.args.ProjectsN > 0 {
+		projects = projects[:c.args.ProjectsN]
+	}
 
 	// sort by creation date
 	sort.Slice(projects, func(i, j int) bool {
