@@ -3,9 +3,10 @@ package repos
 import "github.com/petuhovskiy/neon-lights/internal/models"
 
 type QuerySaverArgs struct {
-	ProjectID *uint
-	RegionID  *uint
-	Exitnode  *string
+	ProjectID   *uint
+	RegionID    *uint
+	Exitnode    *string
+	ProjectMode *string
 }
 
 func (a *QuerySaverArgs) Apply(q *models.Query) {
@@ -17,6 +18,9 @@ func (a *QuerySaverArgs) Apply(q *models.Query) {
 	}
 	if q.Exitnode == "" && a.Exitnode != nil {
 		q.Exitnode = *a.Exitnode
+	}
+	if q.ProjectMode == "" && a.ProjectMode != nil {
+		q.ProjectMode = *a.ProjectMode
 	}
 }
 

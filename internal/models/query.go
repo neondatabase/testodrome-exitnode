@@ -25,6 +25,9 @@ type Query struct {
 	// The node that executed the query.
 	Exitnode string
 
+	// Project mode at the moment of query execution.
+	ProjectMode string
+
 	// Usually refers to a connection establishment query.
 	RelatedQueryID *uint
 

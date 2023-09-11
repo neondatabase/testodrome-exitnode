@@ -159,9 +159,10 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 	}
 
 	saver := repos.NewQuerySaver(c.queryRepo, repos.QuerySaverArgs{
-		ProjectID: nil,
-		RegionID:  &region.ID,
-		Exitnode:  &c.config.Exitnode,
+		ProjectID:   nil,
+		RegionID:    &region.ID,
+		Exitnode:    &c.config.Exitnode,
+		ProjectMode: nil,
 	})
 
 	project, err := queryAPI(ctx, prep, saver)

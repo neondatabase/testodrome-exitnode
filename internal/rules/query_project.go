@@ -188,9 +188,10 @@ func appendPoolerSuffix(connstr string) (string, error) {
 func (r *QueryProject) randomDriver(ctx context.Context, project models.Project, usePooler bool) (drivers.Driver, error) {
 	// save queries to the database with project and exitnode info
 	saver := repos.NewQuerySaver(r.queryRepo, repos.QuerySaverArgs{
-		ProjectID: &project.ID,
-		Exitnode:  &r.exitnode,
-		RegionID:  &project.RegionID,
+		ProjectID:   &project.ID,
+		Exitnode:    &r.exitnode,
+		RegionID:    &project.RegionID,
+		ProjectMode: &project.CurrentMode,
 	})
 
 	connstr := project.ConnectionString
