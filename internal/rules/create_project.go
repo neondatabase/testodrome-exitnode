@@ -38,6 +38,7 @@ type CreateProjectArgs struct {
 	PgVersion      rdesc.Wrand[int]
 	Provisioner    rdesc.Wrand[string]
 	SuspendTimeout rdesc.Wrand[int]
+	Mode           rdesc.Wrand[string]
 }
 
 var defaultPgVersion = rdesc.Wrand[int]{
@@ -59,6 +60,10 @@ var defaultSuspendTimeout = rdesc.Wrand[int]{
 	{Weight: 1, Item: 1},
 }
 
+var defaultProjectMode = rdesc.Wrand[string]{
+	{Weight: 1, Item: ""},
+}
+
 func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 	var args CreateProjectArgs
 	err := json.Unmarshal(j, &args)
@@ -74,6 +79,9 @@ func NewCreateProject(a *app.App, j json.RawMessage) (*CreateProject, error) {
 	}
 	if args.SuspendTimeout == nil {
 		args.SuspendTimeout = defaultSuspendTimeout
+	}
+	if args.Mode == nil {
+		args.Mode = defaultProjectMode
 	}
 
 	return &CreateProject{
@@ -175,6 +183,8 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 		log.Warn(ctx, "project has invalid number of connection strings")
 	}
 
+	mode := c.args.Mode.Pick()
+
 	dbProject := models.Project{
 		RegionID:              region.ID,
 		Name:                  project.Project.Name,
@@ -184,6 +194,7 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 		PgVersion:             project.Project.PgVersion,
 		Provisioner:           project.Project.Provisioner,
 		SuspendTimeoutSeconds: suspendTimeout,
+		CurrentMode:           mode,
 	}
 
 	err = c.projectRepo.Create(&dbProject)

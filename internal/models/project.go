@@ -36,6 +36,9 @@ type Project struct {
 	// Default endpoint will be shut down after this timeout.
 	SuspendTimeoutSeconds int
 
+	// Mode name, which is used by rules to define query strategy.
+	CurrentMode string
+
 	// TODO:
 	// Comment about a policy of creation.
 	// CreationComment string
