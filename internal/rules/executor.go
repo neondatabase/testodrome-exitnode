@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -65,12 +66,25 @@ func (e *Executor) Execute(ctx context.Context, r *Rule) error {
 }
 
 func (e *Executor) executeOnce(ctx context.Context, r *Rule) error {
+	// skip if there was a recent run
+	if r.lastRun != nil && r.desc.MinInterval != nil && time.Since(*r.lastRun) < r.desc.MinInterval.Duration {
+		return nil
+	}
+
+	now := time.Now()
+	r.lastRun = &now
+
 	ctx = log.Into(ctx, string(r.desc.Act))
 	if r.desc.Timeout != nil {
 		// we don't want to cancel context, because Execute can do background work
 		ctx, _ = context.WithTimeout(ctx, r.desc.Timeout.Duration) //nolint:govet
 	}
-	return r.impl.Execute(ctx)
+	err := r.impl.Execute(ctx)
+
+	now = time.Now()
+	r.lastRun = &now
+
+	return err
 }
 
 func (e *Executor) executePeriodic(ctx context.Context, r *Rule, period *Period) error {

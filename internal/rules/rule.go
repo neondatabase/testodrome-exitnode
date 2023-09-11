@@ -11,9 +11,10 @@ import (
 
 // Rule is a fully initialized rule that can be executed via global executor.
 type Rule struct {
-	desc   rdesc.Rule
-	impl   RuleImpl
-	period *Period
+	desc    rdesc.Rule
+	impl    RuleImpl
+	period  *Period
+	lastRun *time.Time
 }
 
 func newRule(desc rdesc.Rule, impl RuleImpl) (*Rule, error) {

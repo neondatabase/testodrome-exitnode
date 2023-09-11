@@ -77,3 +77,8 @@ func (r *ProjectRepo) FindRandomProjects(filters []Filter, n int) ([]models.Proj
 	}
 	return projects, nil
 }
+
+func (r *ProjectRepo) UpdateMode(project *models.Project, newMode string) error {
+	_ = project.CurrentMode
+	return r.db.Model(project).UpdateColumn("current_mode", newMode).Error
+}

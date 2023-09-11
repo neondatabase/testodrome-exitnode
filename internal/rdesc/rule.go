@@ -9,6 +9,7 @@ const (
 	ActDeleteProject Act = "delete_project"
 	ActDoGlobalRules Act = "do_global_rules"
 	ActQueryProject  Act = "query_project"
+	ActChangeMode    Act = "change_mode"
 	ActTest          Act = "test"
 )
 
@@ -25,4 +26,6 @@ type Rule struct {
 	Args json.RawMessage
 	// Timeout for rule execution.
 	Timeout *Duration
+	// Limit the execution frequency by setting minimal interval.
+	MinInterval *Duration
 }
