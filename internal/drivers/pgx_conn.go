@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 
@@ -19,6 +20,8 @@ type PgxConnection struct {
 	conn      *pgx.Conn
 	connQuery *models.Query
 	saver     QuerySaver
+	// local port, backend pid
+	connTracing string
 }
 
 func PgxConnect(ctx context.Context, connstr string, saver QuerySaver) (*PgxConnection, error) {
@@ -31,17 +34,25 @@ func PgxConnect(ctx context.Context, connstr string, saver QuerySaver) (*PgxConn
 		"",
 	)
 	conn, err1 := pgx.Connect(ctx, connstr)
-	finishQuery(connQuery, "", err1)
+	connTracingDetails := ""
+	if conn != nil {
+		internalConn := conn.PgConn()
+		pid := internalConn.PID()
+		netAddr := internalConn.Conn().LocalAddr().String()
+		connTracingDetails = fmt.Sprintf("pid=%v <= %s", pid, netAddr)
+	}
+	finishQuery(connQuery, connTracingDetails, err1)
 
 	if err := saveQuery(saver, connQuery, err1); err != nil {
 		return nil, err
 	}
 
 	return &PgxConnection{
-		connstr:   connstr,
-		conn:      conn,
-		connQuery: connQuery,
-		saver:     saver,
+		connstr:     connstr,
+		conn:        conn,
+		connQuery:   connQuery,
+		saver:       saver,
+		connTracing: connTracingDetails,
 	}, nil
 }
 
