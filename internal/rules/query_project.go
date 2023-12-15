@@ -85,6 +85,8 @@ func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
 		projectFilters = append(projectFilters, repos.RawFilter(args.RawProjectFilter))
 	}
 
+	log.Info(context.Background(), "initialized QueryProject rule", zap.Any("args", args))
+
 	return &QueryProject{
 		args:           args,
 		projectFilters: projectFilters,
