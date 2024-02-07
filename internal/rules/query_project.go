@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync/atomic"
 
 	"go.uber.org/zap"
@@ -206,7 +207,12 @@ func (r *QueryProject) randomDriver(ctx context.Context, project models.Project,
 	}
 
 	driverName := r.args.Driver.Pick()
-	connstr += fmt.Sprintf("?application_name=testodrome/%s", string(driverName))
+	if strings.Contains(connstr, "?") {
+		connstr += "&"
+	} else {
+		connstr += "?"
+	}
+	connstr += fmt.Sprintf("application_name=testodrome/%s", string(driverName))
 
 	switch driverName {
 	case drivers.PgxConn:
