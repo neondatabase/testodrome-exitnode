@@ -54,6 +54,8 @@ var defaultDrivers = rdesc.Wrand[drivers.Name]{
 	{Weight: 1, Item: drivers.PgxConn},
 	{Weight: 1, Item: drivers.GoServerless},
 	{Weight: 1, Item: drivers.VercelEdge},
+	{Weight: 1, Item: drivers.VercelEdgeHTTP07},
+	{Weight: 1, Item: drivers.VercelEdgeHTTP08},
 }
 
 func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
@@ -225,6 +227,12 @@ func (r *QueryProject) randomDriver(ctx context.Context, project models.Project,
 	case drivers.VercelEdge:
 		log.Info(ctx, "using vercel-sl driver")
 		return drivers.NewVercelSL(connstr, saver), nil
+	case drivers.VercelEdgeHTTP07:
+		log.Info(ctx, "using vercel-sl driver")
+		return drivers.NewVercelSLHTTP07(connstr, saver), nil
+	case drivers.VercelEdgeHTTP08:
+		log.Info(ctx, "using vercel-sl driver")
+		return drivers.NewVercelSLHTTP08(connstr, saver), nil
 	}
 
 	return nil, fmt.Errorf("unknown driver: %s", driverName)
