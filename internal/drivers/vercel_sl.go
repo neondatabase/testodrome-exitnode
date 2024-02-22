@@ -15,6 +15,8 @@ import (
 )
 
 const defaultAPIURL = "https://sl-driver.vercel.app/api/query"
+const defaultAPIURLHTTP07 = "https://sl-driver.vercel.app/api/v07/http_query"
+const defaultAPIURLHTTP08 = "https://sl-driver.vercel.app/api/v08/http_query"
 
 type slRequest struct {
 	ConnStr string        `json:"connstr"`
@@ -54,6 +56,22 @@ func NewVercelSL(connstr string, saver QuerySaver) *VercelSL {
 	return &VercelSL{
 		connstr: connstr,
 		apiURL:  defaultAPIURL,
+		saver:   saver,
+	}
+}
+
+func NewVercelSLHTTP07(connstr string, saver QuerySaver) *VercelSL {
+	return &VercelSL{
+		connstr: connstr,
+		apiURL:  defaultAPIURLHTTP07,
+		saver:   saver,
+	}
+}
+
+func NewVercelSLHTTP08(connstr string, saver QuerySaver) *VercelSL {
+	return &VercelSL{
+		connstr: connstr,
+		apiURL:  defaultAPIURLHTTP08,
 		saver:   saver,
 	}
 }

@@ -9,7 +9,9 @@ type SingleQuery struct {
 type Name string
 
 const (
-	PgxConn      = Name("pgx-conn")
-	GoServerless = Name("go-serverless")
-	VercelEdge   = Name("vercel-edge")
+	PgxConn          = Name("pgx-conn")
+	GoServerless     = Name("go-serverless")
+	VercelEdge       = Name("vercel-edge")
+	VercelEdgeHTTP07 = Name("vercel-edge=http07")
+	VercelEdgeHTTP08 = Name("vercel-edge=http08")
 )
