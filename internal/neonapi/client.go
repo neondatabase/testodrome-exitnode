@@ -24,7 +24,7 @@ type Client struct {
 
 func NewClient(domain string, apiKey string) *Client {
 	return &Client{
-		baseURL:    fmt.Sprintf("https://console.%s/api/v2", domain),
+		baseURL:    fmt.Sprintf("https://%s/api/v2", domain),
 		authHeader: fmt.Sprintf("Bearer %s", apiKey),
 	}
 }
