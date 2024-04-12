@@ -148,6 +148,7 @@ func (c *CreateProject) createProject(ctx context.Context, region models.Region)
 
 	createRequest := &neonapi.CreateProject{
 		Name:        fmt.Sprintf("test@%s-%d", c.config.Exitnode, projectSeqID),
+		Branch:      neonapi.CreateProjectBranch{RoleName: "testodrome"},
 		RegionID:    region.DatabaseRegion,
 		PgVersion:   c.args.PgVersion.Pick(),
 		Provisioner: provisioner,
