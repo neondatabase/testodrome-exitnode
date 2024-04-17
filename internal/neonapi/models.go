@@ -130,11 +130,16 @@ type Endpoint struct {
 }
 
 type CreateProject struct {
-	Name     string `json:"name"`
-	RegionID string `json:"region_id"`
+	Name     string              `json:"name"`
+	RegionID string              `json:"region_id"`
+	Branch   CreateProjectBranch `json:"branch"`
 
 	PgVersion   int    `json:"pg_version"`
 	Provisioner string `json:"provisioner"`
+}
+
+type CreateProjectBranch struct {
+	RoleName string `json:"role_name"`
 }
 
 type DeleteProjectResponse struct {
