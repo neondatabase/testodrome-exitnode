@@ -54,8 +54,8 @@ var defaultDrivers = rdesc.Wrand[drivers.Name]{
 	{Weight: 1, Item: drivers.PgxConn},
 	{Weight: 1, Item: drivers.GoServerless},
 	{Weight: 1, Item: drivers.VercelEdge},
-	{Weight: 1, Item: drivers.VercelEdgeHTTP07},
 	{Weight: 1, Item: drivers.VercelEdgeHTTP08},
+	{Weight: 1, Item: drivers.VercelNodeHTTP09},
 }
 
 func NewQueryProject(a *app.App, j json.RawMessage) (*QueryProject, error) {
@@ -216,23 +216,21 @@ func (r *QueryProject) randomDriver(ctx context.Context, project models.Project,
 	}
 	connstr += fmt.Sprintf("application_name=testodrome/%s", string(driverName))
 
+	log.Info(ctx, "using driver", zap.String("driver", string(driverName)))
 	switch driverName {
 	case drivers.PgxConn:
-		log.Info(ctx, "using pgx driver")
 		connstr += "&default_query_exec_mode=simple_protocol"
 		return drivers.PgxConnect(ctx, connstr, saver)
 	case drivers.GoServerless:
-		log.Info(ctx, "using serverless driver")
 		return drivers.NewServerless(connstr, saver)
 	case drivers.VercelEdge:
-		log.Info(ctx, "using vercel-sl driver")
-		return drivers.NewVercelSL(connstr, saver), nil
+		return drivers.NewVercelSL(connstr, saver, drivers.VercelEdge04), nil
 	case drivers.VercelEdgeHTTP07:
-		log.Info(ctx, "using vercel-sl driver")
-		return drivers.NewVercelSLHTTP07(connstr, saver), nil
+		return drivers.NewVercelSL(connstr, saver, drivers.VercelEdge07), nil
 	case drivers.VercelEdgeHTTP08:
-		log.Info(ctx, "using vercel-sl driver")
-		return drivers.NewVercelSLHTTP08(connstr, saver), nil
+		return drivers.NewVercelSL(connstr, saver, drivers.VercelEdge08), nil
+	case drivers.VercelNodeHTTP09:
+		return drivers.NewVercelSL(connstr, saver, drivers.VercelNode09), nil
 	}
 
 	return nil, fmt.Errorf("unknown driver: %s", driverName)

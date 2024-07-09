@@ -14,9 +14,13 @@ import (
 	"github.com/petuhovskiy/neon-lights/internal/models"
 )
 
-const defaultAPIURL = "https://sl-driver.vercel.app/api/query"
-const defaultAPIURLHTTP07 = "https://sl-driver.vercel.app/api/v07/http_query"
-const defaultAPIURLHTTP08 = "https://sl-driver.vercel.app/api/v08/http_query"
+// websockets
+const VercelEdge04 = "https://sl-driver.vercel.app/api/query"
+
+// http
+const VercelEdge07 = "https://sl-driver.vercel.app/api/v07/http_query"
+const VercelEdge08 = "https://sl-driver.vercel.app/api/v08/http_query"
+const VercelNode09 = "https://neon-vercel-node.vercel.app/api/query"
 
 type slRequest struct {
 	ConnStr string        `json:"connstr"`
@@ -52,26 +56,10 @@ type VercelSL struct {
 	apiURL  string
 }
 
-func NewVercelSL(connstr string, saver QuerySaver) *VercelSL {
+func NewVercelSL(connstr string, saver QuerySaver, apiURL string) *VercelSL {
 	return &VercelSL{
 		connstr: connstr,
-		apiURL:  defaultAPIURL,
-		saver:   saver,
-	}
-}
-
-func NewVercelSLHTTP07(connstr string, saver QuerySaver) *VercelSL {
-	return &VercelSL{
-		connstr: connstr,
-		apiURL:  defaultAPIURLHTTP07,
-		saver:   saver,
-	}
-}
-
-func NewVercelSLHTTP08(connstr string, saver QuerySaver) *VercelSL {
-	return &VercelSL{
-		connstr: connstr,
-		apiURL:  defaultAPIURLHTTP08,
+		apiURL:  apiURL,
 		saver:   saver,
 	}
 }
@@ -112,6 +100,7 @@ func (s *VercelSL) queries(ctx context.Context, queries ...SingleQuery) ([]model
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	// TODO: non-default client
 	resp, err := http.DefaultClient.Do(req)
