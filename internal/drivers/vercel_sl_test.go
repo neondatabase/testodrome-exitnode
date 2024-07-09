@@ -14,7 +14,7 @@ func TestVercelSL(t *testing.T) {
 
 	cli := &VercelSL{
 		connstr: "postgres://user:pass@ep-non-existent-123456.us-east-2.aws.neon.build/neondb",
-		apiURL:  defaultAPIURL,
+		apiURL:  VercelNode09,
 	}
 	ctx := context.Background()
 	_, err := cli.Queries(ctx, SingleQuery{
