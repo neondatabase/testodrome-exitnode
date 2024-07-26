@@ -21,6 +21,7 @@ const VercelEdge04 = "https://sl-driver.vercel.app/api/query"
 const VercelEdge07 = "https://sl-driver.vercel.app/api/v07/http_query"
 const VercelEdge08 = "https://sl-driver.vercel.app/api/v08/http_query"
 const VercelNode09 = "https://neon-vercel-node.vercel.app/api/query"
+const VercelNode09WS = "https://neon-vercel-node.vercel.app/api/ws_query"
 
 type slRequest struct {
 	ConnStr string        `json:"connstr"`

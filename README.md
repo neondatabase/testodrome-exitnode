@@ -26,7 +26,7 @@ go run main.go | tee -a app.log
 
 One more example:
 ```bash
-go run main.go '{"act": "query_project", "timeout": "10m", "args": {"Driver": [{"Weight": 1, "Item": "vercel-node=http09"}], "Scenario": "activityV1", "RawProjectFilter": "projects.suspend_timeout_seconds = 0", "MaxRandomProjects": 1}}' | tee -a app.log
+go run main.go '{"act": "query_project", "timeout": "10m", "args": {"Driver": [{"Weight": 1, "Item": "vercel-node=pool09"}], "Scenario": "activityV1", "RawProjectFilter": "projects.suspend_timeout_seconds = 0", "MaxRandomProjects": 1}}' | tee -a app.log
 ```
 
 ## Deploying

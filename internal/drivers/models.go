@@ -15,4 +15,5 @@ const (
 	VercelEdgeHTTP07 = Name("vercel-edge=http07")
 	VercelEdgeHTTP08 = Name("vercel-edge=http08")
 	VercelNodeHTTP09 = Name("vercel-node=http09")
+	VercelNodePool09 = Name("vercel-node=pool09")
 )
